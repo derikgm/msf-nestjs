@@ -15,6 +15,7 @@ export class DelysService {
   dulces: Dulce[] = ofertas;
 
   constructor(private configService: ConfigService){
+    //TODO: buscar como cambiar esto a algo que funcione mejor
     this.db = new Database(configService.get(`SQLITECLOUD_URL`)!);
   }
 
