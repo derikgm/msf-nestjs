@@ -1,11 +1,11 @@
-import { createServer } from 'node:http';
+// server.js
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './dist/app.module.js'; // Importa tu módulo raíz compilado
 
-const port = process.env.PORT || 3000;
-const body = 'Hello from NestJS on Wasmer Edge';
-
-createServer((request, response) => {
-  response.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
-  response.end(body);
-}).listen(port, () => {
-  console.log('NestJS server listening on ' + port);
-});
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+  console.log(`NestJS server listening on ${port}`);
+}
+bootstrap();
