@@ -11,7 +11,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ofertas } from './data/ofertas.js';
 import { ConfigService } from '@nestjs/config';
-import { Database } from '@sqlitecloud/drivers';
 import { toPlainArray } from '../common/utils/rowset.util.js';
 let DelysService = class DelysService {
     configService;
@@ -20,7 +19,6 @@ let DelysService = class DelysService {
     dulces = ofertas;
     constructor(configService) {
         this.configService = configService;
-        this.db = new Database(configService.get(`SQLITECLOUD_URL`));
     }
     agregarEncargo(createPedidoDto) {
         const { encargos } = createPedidoDto;

@@ -1,0 +1,22 @@
+annotations:
+  anybuild.run/config:
+    commands:
+      start: node server.js
+    edgejs_enable: true
+    edgejs_precompile: true
+    name: out
+    node_framework: nestjs
+    node_install_inputs:
+    - package.json
+    node_package_manager: npm
+    node_package_name: js-nestjs
+    node_remove_native_binaries: true
+    node_server: express
+  anybuild.run/provider: node
+  anybuild.run/version: 0.28.4
+  wasmer.io/version: 7.4.1
+app_id: da_nBBIbtXU3j5o
+kind: wasmer.io/App.v0
+name: derikgm-msf-nestjs
+owner: derikzgm
+package: sha256:27b17485e4653348f930b42d857437449922caf8b4fb97c7bbc946867ccaca5e
