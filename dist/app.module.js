@@ -29,6 +29,7 @@ AppModule = __decorate([
                         rejectUnauthorized: false,
                     },
                     connectTimeoutMS: 30000,
+                    uuidExtension: 'pgcrypto',
                 }),
             }),
             DelysModule,

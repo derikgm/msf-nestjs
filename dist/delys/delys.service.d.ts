@@ -1,23 +1,30 @@
+import { OnApplicationBootstrap } from '@nestjs/common';
+import { Repository } from 'typeorm';
 import { CreatePedidoDto } from './dto/create-pedido.dto.js';
-import { Dulce, Pedido } from './interfaces/delys.interfaces.js';
-import { ConfigService } from '@nestjs/config';
-export declare class DelysService {
-    private configService;
-    private db;
-    pedidos: Pedido[];
-    dulces: Dulce[];
-    constructor(configService: ConfigService);
-    agregarEncargo(createPedidoDto: CreatePedidoDto): {
+import { Dulce, Encargo, Pedido } from './entities/index.js';
+export declare class DelysService implements OnApplicationBootstrap {
+    private readonly pedidoRepo;
+    private readonly encargoRepo;
+    private readonly dulceRepo;
+    private readonly logger;
+    constructor(pedidoRepo: Repository<Pedido>, encargoRepo: Repository<Encargo>, dulceRepo: Repository<Dulce>);
+    onApplicationBootstrap(): Promise<void>;
+    crearPedido(createPedidoDto: CreatePedidoDto): Promise<{
         ok: boolean;
         pedido: Pedido;
-    };
+    }>;
     obtenerTodosDulces(): Promise<{
         dulces: Dulce[];
-    } | undefined>;
-    obtenerTodosPedidos(): Promise<void>;
-    obtenerEncargo(id: string): Pedido;
-    remove(id: string): {
+    }>;
+    obtenerTodosPedidos(): Promise<{
+        pedidos: Pedido[];
+    }>;
+    obtenerPedido(id: string): Promise<Pedido>;
+    remove(id: string): Promise<{
         ok: boolean;
+    }>;
+    obtenerOfertas(): {
+        ofertas: import("./interfaces/delys.interfaces.js").Dulce[];
     };
-    obtenerOfertas(): string;
+    private upsertDulce;
 }

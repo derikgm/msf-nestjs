@@ -7,72 +7,88 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+var DelysService_1;
+import { Inject, Injectable, Logger, NotFoundException, } from '@nestjs/common';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Dulce, Encargo, Pedido } from './entities/index.js';
 import { ofertas } from './data/ofertas.js';
-import { ConfigService } from '@nestjs/config';
-import { toPlainArray } from '../common/utils/rowset.util.js';
-let DelysService = class DelysService {
-    configService;
-    db;
-    pedidos = [];
-    dulces = ofertas;
-    constructor(configService) {
-        this.configService = configService;
+const relations = {
+    encargos: { dulce: true },
+};
+let DelysService = DelysService_1 = class DelysService {
+    pedidoRepo;
+    encargoRepo;
+    dulceRepo;
+    logger = new Logger(DelysService_1.name);
+    constructor(pedidoRepo, encargoRepo, dulceRepo) {
+        this.pedidoRepo = pedidoRepo;
+        this.encargoRepo = encargoRepo;
+        this.dulceRepo = dulceRepo;
     }
-    agregarEncargo(createPedidoDto) {
-        const { encargos } = createPedidoDto;
+    async onApplicationBootstrap() {
+        if ((await this.dulceRepo.count()) > 0)
+            return;
+        await this.dulceRepo.save(this.dulceRepo.create(ofertas));
+        this.logger.log(`Catálogo inicial cargado: ${ofertas.length} dulces`);
+    }
+    async crearPedido(createPedidoDto) {
+        const { encargos: encargosDto } = createPedidoDto;
+        const dulces = await this.dulceRepo.save(await Promise.all(encargosDto.map((encargo) => this.upsertDulce(encargo.dulce))));
         let precio_total = 0;
-        const encargosMapeados = encargos.map((e) => {
-            const subtotal = e.dulce.precio * e.cantidad;
-            precio_total += subtotal;
-            return {
-                dulce: {
-                    id: e.dulce.id,
-                    nombre: e.dulce.nombre,
-                    precio: e.dulce.precio,
-                },
-                cantidad: e.cantidad,
-            };
+        const encargos = encargosDto.map((encargoDto, i) => {
+            precio_total += dulces[i].precio * encargoDto.cantidad;
+            return this.encargoRepo.create({
+                dulce: dulces[i],
+                cantidad: encargoDto.cantidad,
+            });
         });
-        const pedido = {
-            id: randomUUID(),
-            encargos: encargosMapeados,
-            precio_total,
-        };
-        this.pedidos.push(pedido);
-        return { ok: true, pedido };
+        const pedido = await this.pedidoRepo.save(this.pedidoRepo.create({ precio_total, encargos }));
+        return { ok: true, pedido: await this.obtenerPedido(pedido.id) };
     }
     async obtenerTodosDulces() {
-        try {
-            const data = await this.db.sql(`SELECT * FROM dulce`);
-            const dulces = toPlainArray(data);
-            return { dulces };
-        }
-        catch (e) {
-            console.log("Un error ocurrio: ", e);
-        }
+        const dulces = await this.dulceRepo.find({ order: { id: 'ASC' } });
+        return { dulces };
     }
     async obtenerTodosPedidos() {
+        const pedidos = await this.pedidoRepo.find({ relations });
+        return { pedidos };
     }
-    obtenerEncargo(id) {
-        const encargo = this.pedidos.find(e => e.id == id);
-        if (!encargo)
-            throw new NotFoundException();
-        return encargo;
+    async obtenerPedido(id) {
+        const pedido = await this.pedidoRepo.findOne({ where: { id }, relations });
+        if (!pedido)
+            throw new NotFoundException(`No existe el pedido ${id}`);
+        return pedido;
     }
-    remove(id) {
-        this.obtenerEncargo(id);
-        this.pedidos = this.pedidos.filter(e => !(e.id == id));
+    async remove(id) {
+        const pedido = await this.pedidoRepo.findOneBy({ id });
+        if (!pedido)
+            throw new NotFoundException(`No existe el pedido ${id}`);
+        await this.pedidoRepo.remove(pedido);
         return { ok: true };
     }
     obtenerOfertas() {
-        return `Seccion de ofertas...`;
+        return { ofertas };
+    }
+    async upsertDulce(dto) {
+        const dulce = (await this.dulceRepo.findOneBy({ id: dto.id })) ?? this.dulceRepo.create();
+        dulce.id = dto.id;
+        dulce.nombre = dto.nombre;
+        dulce.precio = dto.precio;
+        return dulce;
     }
 };
-DelysService = __decorate([
+DelysService = DelysService_1 = __decorate([
     Injectable(),
-    __metadata("design:paramtypes", [ConfigService])
+    __param(0, Inject(getRepositoryToken(Pedido))),
+    __param(1, Inject(getRepositoryToken(Encargo))),
+    __param(2, Inject(getRepositoryToken(Dulce))),
+    __metadata("design:paramtypes", [Repository,
+        Repository,
+        Repository])
 ], DelysService);
 export { DelysService };
 //# sourceMappingURL=delys.service.js.map
