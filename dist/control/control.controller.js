@@ -9,6 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 import { Controller, Get } from '@nestjs/common';
 import { ControlService } from './control.service.js';
+import { Public } from '../auth/public.decorator.js';
 let ControlController = class ControlController {
     controlService;
     constructor(controlService) {
@@ -19,7 +20,8 @@ let ControlController = class ControlController {
     }
 };
 __decorate([
-    Get("ping"),
+    Public(),
+    Get('ping'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)

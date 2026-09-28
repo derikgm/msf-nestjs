@@ -9,11 +9,26 @@ import {
 } from '@nestjs/common';
 import { DelysService } from './delys.service.js';
 import { CreatePedidoDto } from './dto/create-pedido.dto.js';
+import { Public } from '../auth/public.decorator.js';
 
 @Controller('delys')
 export class DelysController {
   constructor(private readonly delysService: DelysService) {}
 
+  // Rutas del catálogo: públicas, sin token.
+  @Public()
+  @Get('dulces')
+  obtenerDulces() {
+    return this.delysService.obtenerTodosDulces();
+  }
+
+  @Public()
+  @Get('ofertas')
+  obtenerOfertas() {
+    return this.delysService.obtenerOfertas();
+  }
+
+  // Rutas de pedidos: protegidas por el JwtAuthGuard global.
   @Post('pedido')
   agregarPedido(@Body() createPedidoDto: CreatePedidoDto) {
     return this.delysService.crearPedido(createPedidoDto);
@@ -22,17 +37,6 @@ export class DelysController {
   @Get('pedidos')
   obtenerPedidos() {
     return this.delysService.obtenerTodosPedidos();
-  }
-
-  @Get('dulces')
-  obtenerDulces() {
-    return this.delysService.obtenerTodosDulces();
-  }
-
-  //SECCION DE OFERTAS (debe ir antes de ':id' o ":id" se lo come)
-  @Get('ofertas')
-  obtenerOfertas() {
-    return this.delysService.obtenerOfertas();
   }
 
   @Get(':id')

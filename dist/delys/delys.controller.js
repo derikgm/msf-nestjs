@@ -13,22 +13,23 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, } from '@nestjs/common';
 import { DelysService } from './delys.service.js';
 import { CreatePedidoDto } from './dto/create-pedido.dto.js';
+import { Public } from '../auth/public.decorator.js';
 let DelysController = class DelysController {
     delysService;
     constructor(delysService) {
         this.delysService = delysService;
-    }
-    agregarPedido(createPedidoDto) {
-        return this.delysService.crearPedido(createPedidoDto);
-    }
-    obtenerPedidos() {
-        return this.delysService.obtenerTodosPedidos();
     }
     obtenerDulces() {
         return this.delysService.obtenerTodosDulces();
     }
     obtenerOfertas() {
         return this.delysService.obtenerOfertas();
+    }
+    agregarPedido(createPedidoDto) {
+        return this.delysService.crearPedido(createPedidoDto);
+    }
+    obtenerPedidos() {
+        return this.delysService.obtenerTodosPedidos();
     }
     findOne(id) {
         return this.delysService.obtenerPedido(id);
@@ -37,6 +38,20 @@ let DelysController = class DelysController {
         return this.delysService.remove(id);
     }
 };
+__decorate([
+    Public(),
+    Get('dulces'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], DelysController.prototype, "obtenerDulces", null);
+__decorate([
+    Public(),
+    Get('ofertas'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], DelysController.prototype, "obtenerOfertas", null);
 __decorate([
     Post('pedido'),
     __param(0, Body()),
@@ -50,18 +65,6 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], DelysController.prototype, "obtenerPedidos", null);
-__decorate([
-    Get('dulces'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
-], DelysController.prototype, "obtenerDulces", null);
-__decorate([
-    Get('ofertas'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
-], DelysController.prototype, "obtenerOfertas", null);
 __decorate([
     Get(':id'),
     __param(0, Param('id', new ParseUUIDPipe())),

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DelysModule } from './delys/delys.module.js';
 import { ControlModule } from './control/control.module.js';
+import { AuthModule } from './auth/auth.module.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 
@@ -26,6 +27,7 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
     }),
     DelysModule,
     ControlModule,
+    AuthModule,
   ],
   controllers: [],
   providers: [],
