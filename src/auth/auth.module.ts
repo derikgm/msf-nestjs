@@ -1,19 +1,21 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
+import { APP_GUARD } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './auth.guard.js';
-import { requireEnv } from '../common/utils/env.util.js';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Usuario } from './entities/usuario.entity.js';
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([Usuario]),
     JwtModule.registerAsync({
       global: true,
       inject: [ConfigService],
       useFactory: (config: ConfigService): JwtModuleOptions => ({
-        secret: requireEnv(config, 'AUTH_JWT_SECRET'),
+        secret: config.get<string>('AUTH_JWT_SECRET'),
       }),
     }),
   ],

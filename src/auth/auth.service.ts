@@ -1,38 +1,42 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto.js';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Usuario } from './entities/usuario.entity.js';
 import { verifyPassword } from './password.util.js';
-import { requireEnv } from '../common/utils/env.util.js';
-import { parseDurationToSeconds } from '../common/utils/duration.util.js';
-
-const USUARIO = 'admin';
+import { AuthUser } from './auth.interfaces.js';
 
 @Injectable()
 export class AuthService {
-  private readonly passwordHash: string;
-  private readonly expiresIn: number;
-
   constructor(
     private readonly jwtService: JwtService,
-    config: ConfigService,
-  ) {
-    this.passwordHash = requireEnv(config, 'AUTH_PASSWORD_HASH');
-    this.expiresIn = parseDurationToSeconds(
-      config.get<string>('AUTH_JWT_EXPIRES_IN') ?? '8h',
-    );
-  }
+    @InjectRepository(Usuario)
+    private readonly usuarioRepository: Repository<Usuario>,
+  ) {}
 
-  /** Valida la contraseña y devuelve un token para las rutas protegidas. */
+  /** Busca al usuario por nombre de usuario y verifica la contraseña. */
   async login(dto: LoginDto) {
-    if (!verifyPassword(dto.password, this.passwordHash)) {
-      throw new UnauthorizedException('Contraseña incorrecta');
+    const usuario = await this.usuarioRepository.findOne({
+      where: { usuario: dto.usuario.toLowerCase() },
+    });
+
+    if (!usuario) {
+      throw new UnauthorizedException('Credenciales incorrectas');
+    }
+
+    if (!verifyPassword(dto.password, usuario.password_hash)) {
+      throw new UnauthorizedException('Credenciales incorrectas');
     }
 
     return {
-      access_token: await this.jwtService.signAsync({ sub: USUARIO }),
+      access_token: await this.jwtService.signAsync({
+        sub: usuario.id,
+        usuario: usuario.usuario,
+        rol: usuario.rol,
+      }),
       token_type: 'Bearer',
-      expires_in: this.expiresIn,
+      expires_in: 8 * 60 * 60,
     };
   }
 }
