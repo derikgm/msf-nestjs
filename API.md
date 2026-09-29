@@ -1,64 +1,12 @@
-# Notas de trabajo
+# API
 
-Pendientes de decisión y referencia completa de la API.
-Fecha de la última verificación: 2026-09-29 (`npm run build` en verde, endpoints probados contra la BD real).
-
----
-
-## 1. Decisiones pendientes
-
-### 1.1 El precio de los dulces lo manda el cliente
-
-**Situación.** `POST /delys/pedido` no recibe solo el identificador del dulce: recibe el dulce entero (`id`, `nombre`, `precio`) y `DelysService.upsertDulce()` lo escribe tal cual en la tabla `dulce` (`src/delys/delys.service.ts:101`).
-
-**Qué pasa hoy.** Un usuario autenticado puede mandar `precio: 1` para un dulce que en el catálogo vale 1000, y como el total se calcula con lo que quedó guardado (`precio_total += dulces[i].precio * cantidad`), el pedido sale por 1. También puede renombrar un dulce o inventarse uno nuevo con el id que quiera. El precio oficial de la pastelería deja de estar en el servidor.
-
-**No es un descuido de la cuota ni de las imágenes**, pero las dos cosas que sí construimos (cuota por proyecto e imágenes) asumen que el catálogo lo controla el servidor, así que dejarlo abierto es incoherente.
-
-**Opción A — la recomendada.** Que el DTO pida solo el id y el precio salga siempre de la BD:
-
-```json
-{ "encargos": [ { "dulce": 1, "cantidad": 2 } ] }
-```
-
-`crearPedido()` carga los dulces con `findBy({ id: In(ids) })`, calcula el total con esos precios y responde `404` (o `400` con el detalle) si algún id no existe. La ventaja es que el cliente no puede mentir y el payload se parece al carrito que ve el usuario. Lo que cuesta: cambiar `CreateDulceDto`/`CreateEncargoDto`, borrar `upsertDulce()` y ajustar el cliente Tauri.
-
-**Opción B — la que hay.** Dejar el DTO como está y solo validar en el servicio que el `precio` y el `nombre` que llegan coincidan con los del catálogo, rechazando el pedido si no. Se arregla el agujero sin cambiar la API, pero sigue siendo raro que un endpoint de pedido sirva para escribir el catálogo.
-
-**Opción C — no hacer nada ahora.** Aceptar el riesgo mientras la pastelería sea la única usuaria. No recomendado: en cuanto haya dos personas usando la app, cualquiera puede rebajar precios.
-
----
-
-### 1.2 Las rutas de pedidos cambiaron de nombre
-
-**Situación.** Antes eran `GET /delys/:id` y `DELETE /delys/:id`; ahora son `GET /delys/pedidos/:id` y `DELETE /delys/pedidos/:id`.
-
-**Por qué.** Con las rutas de imágenes, `GET /delys/dulces` (público) y `GET /delys/dulces/:id/imagen` convivían con un comodín `GET /delys/:id`. Hoy funciona porque Nest registra en orden, pero es frágil: el día que se agregue `GET /delys/ofertas/...` el comodín se puede comer la ruta. Con `pedidos/` delante el emparejamiento es exacto y no hay ambigüedad.
-
-**Qué implica.** Si el cliente Tauri ya está consuming `/delys/:id`, hay que cambiarlo por `/delys/pedidos/:id`. Si el cliente todavía no existe, no hay nada que hacer y nos quedamos con el nombre explícito.
-
-**Decisión.** ¿Se deja como está o se vuelve a `/delys/:id`?
-
----
-
-### 1.3 Cosas que también hay que hacer antes de producción
-
-No son decisiones, solo recordatorios que quedaron sueltos:
-
-* Falta la `SUPABASE_SERVICE_ROLE_KEY` real en `.env` (ahora está el marcador) y hay que crear los buckets `delys` y `domus` públicos de lectura en el panel de Supabase. Hasta eso, la subida real no se pudo probar: el `503` que devolvía era el guard de credenciales, no un fallo de la lógica.
-* No hay límite de intentos de login (`@nestjs/throttler`) ni log de auditoría.
-* La tabla `storage_quota` se crea sola con `synchronize: true`. Cuando eso se desactive hay que generar la migración de `usuario`, `storage_quota` y la columna `dulce.imagen_bytes` / `dulce.imagen_url`.
-* En la base de datos de pruebas quedó una tabla `test` suelta de una sesión anterior; se puede borrar.
-
----
-
-## 2. API
+Referencia de los endpoints: qué reciben, qué devuelven y qué errores dan. Las decisiones de diseño están en [Decisiones.md](Decisiones.md).
 
 Base: `http://127.0.0.1:3000`
 
 Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma del token + que el usuario siga activo en la BD) y después `RolesGuard` (`@Roles('delys')`). **Si una ruta no está marcada con `@Public()`, nace protegida.** El `rol` viaja dentro del token; el cliente nunca lo elige.
 
-### 2.1 Resumen
+## Resumen
 
 | Método | Ruta | Acceso |
 | --- | --- | --- |
@@ -71,12 +19,14 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `POST` | `/auth/cambiar-password` | cualquier rol, solo la propia contraseña |
 | `GET` | `/auth/yo` | cualquier rol |
 | `GET` | `/storage/quota` | cualquier rol, devuelve la cuota de su proyecto |
-| `POST` | `/delys/pedido` | `delys` |
-| `GET` | `/delys/pedidos` | `delys` |
-| `GET` | `/delys/pedidos/:id` | `delys` |
-| `DELETE` | `/delys/pedidos/:id` | `delys` |
-| `POST` | `/delys/dulces/:id/imagen` | `delys` |
-| `DELETE` | `/delys/dulces/:id/imagen` | `delys` |
+| `POST` | `/delys/pedido` | `delys` o `admin` |
+| `GET` | `/delys/pedidos` | `delys` o `admin` |
+| `GET` | `/delys/pedidos/:id` | `delys` o `admin` |
+| `DELETE` | `/delys/pedidos/:id` | `delys` o `admin` |
+| `POST` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
+| `DELETE` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
+
+`admin` es el único rol con paso libre: `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin importar el rol que pida. El resto de roles solo ven lo de su propio proyecto (ver [Decisiones.md](Decisiones.md), punto 1.3).
 
 Formato de errores, siempre el mismo:
 
@@ -84,11 +34,20 @@ Formato de errores, siempre el mismo:
 { "message": "No existe el dulce 99", "error": "Bad Request", "statusCode": 400 }
 ```
 
-Códigos usados: `400` datos inválidos o cuota insuficiente, `401` sin token / token caducado / contraseña incorrecta, `403` rol que no es el del proyecto, `404` recurso inexistente, `409` `usuario` repetido, `503` falta la configuración de Supabase.
+Códigos usados: `400` datos inválidos o cuota insuficiente, `401` sin token / token caducado / contraseña incorrecta / usuario desactivado, `403` rol que no es el del proyecto, `404` recurso inexistente, `409` `usuario` repetido, `503` falta la configuración de Supabase **o** la base de datos no respondió.
+
+Los cuatro fallos del guard tienen mensajes distintos, para que el cliente sepa si tiene que iniciar sesión otra vez o solo reintentar:
+
+| Situación | Respuesta | Qué debe hacer el cliente |
+| --- | --- | --- |
+| Sin cabecera `Authorization` | `401` "Falta el token. Envíalo como: Authorization: Bearer &lt;token&gt;" | pedir el token |
+| Firma inválida o token caducado | `401` "El token no es válido o ya caducó" | iniciar sesión otra vez |
+| El usuario fue desactivado | `401` "El usuario de este token ya no está activo" | iniciar sesión otra vez (o mostrar "cuenta desactivada") |
+| La base de datos no respondió | `503` "No se puede comprobar la sesión en este momento" | **reintentar**, no cerrar sesión |
 
 ---
 
-### 2.2 `GET /ping`
+### 2. `GET /ping`
 
 Health check. Sin parámetros, sin token.
 
@@ -99,7 +58,7 @@ curl localhost:3000/ping
 
 ---
 
-### 2.3 `POST /auth/login`
+### 3. `POST /auth/login`
 
 Devuelve el token que usan todas las rutas protegidas. Sin parámetros de ruta.
 
@@ -126,7 +85,7 @@ curl -X POST localhost:3000/auth/login \
 
 ---
 
-### 2.4 `POST /auth/registro`
+### 4. `POST /auth/registro`
 
 Alta del **primer** usuario de un proyecto. Sin token mientras el rol esté vacío; en cuanto el rol tiene un usuario, esta ruta se cierra (401) y hay que usar `/auth/usuarios`.
 
@@ -135,7 +94,7 @@ Alta del **primer** usuario de un proyecto. Sin token mientras el rol esté vac�
 | `nombre` | string | obligatorio, máx. 120 |
 | `usuario` | string | obligatorio, máx. 60, único |
 | `password` | string | obligatorio, entre 8 y 200 caracteres |
-| `rol` | string | opcional, `delys` o `domus`. Si se omite, `delys` |
+| `rol` | string | opcional, `delys`, `domus` o `admin`. Si se omite, `delys` |
 
 ```bash
 # Primer arranque del proyecto delys: la tabla usuario está vacía.
@@ -160,7 +119,7 @@ La respuesta nunca incluye el hash. Para crear un proyecto nuevo se repite con `
 
 ---
 
-### 2.5 `POST /auth/usuarios`
+### 5. `POST /auth/usuarios`
 
 Alta de más gente **dentro del proyecto de quien llama**. Requiere `Authorization: Bearer <token>`.
 
@@ -182,7 +141,7 @@ Mismo cuerpo de respuesta que `/auth/registro`. Un token de `delys` no puede cre
 
 ---
 
-### 2.6 `POST /auth/cambiar-password`
+### 6. `POST /auth/cambiar-password`
 
 Cambia la contraseña del que llama. Requiere token.
 
@@ -206,7 +165,7 @@ Si `password_actual` no coincide da `401` y no cambia nada. El token sigue siend
 
 ---
 
-### 2.7 `GET /auth/yo`
+### 7. `GET /auth/yo`
 
 Devuelve lo que el token afirma ser el usuario. Sin parámetros.
 
@@ -220,7 +179,7 @@ curl localhost:3000/auth/yo -H "Authorization: Bearer eyJ..."
 
 ---
 
-### 2.8 `GET /storage/quota`
+### 8. `GET /storage/quota`
 
 Estado de la cuota **del proyecto del token** (no del usuario: los usuarios de `delys` comparten la misma). Sin parámetros.
 
@@ -246,7 +205,7 @@ INSERT INTO storage_quota (rol, bytes_usados, limite_bytes) VALUES ('delys-domic
 
 ---
 
-### 2.9 `GET /delys/dulces`
+### 9. `GET /delys/dulces`
 
 Catálogo. Sin token, pensado para que la vitrina se vea sin iniciar sesión.
 
@@ -266,7 +225,7 @@ curl localhost:3000/delys/dulces
 
 ---
 
-### 2.10 `GET /delys/ofertas`
+### 10. `GET /delys/ofertas`
 
 Texto de las ofertas (sin imágenes). Sin token.
 
@@ -277,19 +236,16 @@ curl localhost:3000/delys/ofertas
 
 ---
 
-### 2.11 `POST /delys/pedido`
+### 11. `POST /delys/pedido`
 
 Crea un pedido. Requiere token con rol `delys`.
 
-**Ojo con la forma del `dulce`:** el DTO actual (`src/delys/dto/create-pedido.dto.ts`) pide el dulce completo, no solo el id. Es justo lo que se decide en el punto 1.1.
+**El `dulce` es solo el id.** El nombre y el precio los pone el servidor leyéndolos del catálogo: mandarlos en el body no sirve de nada (ver [Decisiones.md](Decisiones.md), punto 1.1).
 
 | Parámetro | Tipo | Reglas |
 | --- | --- | --- |
 | `encargos` | array | obligatorio, mínimo 1 elemento |
-| `encargos[].dulce` | object | obligatorio, con `id`, `nombre` y `precio` |
-| `encargos[].dulce.id` | number | entero positivo. Es la clave primaria del catálogo |
-| `encargos[].dulce.nombre` | string | no vacío |
-| `encargos[].dulce.precio` | number | mayor que 0 |
+| `encargos[].dulce` | number | entero positivo. Es la clave primaria del catálogo |
 | `encargos[].cantidad` | number | entero, mínimo 1 |
 
 ```bash
@@ -298,8 +254,8 @@ curl -X POST localhost:3000/delys/pedido \
   -H 'content-type: application/json' \
   -d '{
         "encargos": [
-          { "dulce": { "id": 1, "nombre": "Charolas surtida", "precio": 1000 }, "cantidad": 2 },
-          { "dulce": { "id": 3, "nombre": "Panetela Grande de Chocolate", "precio": 5500 }, "cantidad": 1 }
+          { "dulce": 1, "cantidad": 2 },
+          { "dulce": 3, "cantidad": 1 }
         ]
       }'
 ```
@@ -310,16 +266,29 @@ curl -X POST localhost:3000/delys/pedido \
   "pedido": {
     "id": "f9f64eb3-50d6-4748-8ecd-1847b03af017",
     "precio_total": 7500,
-    "encargos": [ { "dulce": { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "imagen_bytes": null }, "cantidad": 2 } ]
+    "encargos": [
+      { "id": "2ae13797-...", "dulce": { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "imagen_bytes": null }, "cantidad": 2 },
+      { "id": "aa1aa799-...", "dulce": { "id": 3, "nombre": "Panetela Grande de Chocolate", "precio": 5500, "imagen_url": null, "imagen_bytes": null }, "cantidad": 1 }
+    ]
   }
 }
 ```
 
-`precio_total` lo calcula el servidor: 2 × 1000 + 1 × 5500 = 7500. Mandar `"dulce": 1` en vez del objeto da `400` ("nested property dulce must be either object or array").
+`precio_total` lo calcula el servidor con los precios del catálogo: 2 × 1000 + 1 × 5500 = 7500.
+
+| Situación | Respuesta |
+| --- | --- |
+| `"dulce": 1` (número) | correcto |
+| `"dulce": 99`, id inexistente | `404` "No existe el dulce 99" |
+| `"dulce": 98` y `99`, varios inexistentes | `404` "No existen los dulces 98, 99" |
+| `"dulce": {"id":1,"nombre":"...","precio":1000}` (forma vieja) | `400` "encargos.0.dulce must be a positive number" |
+| `cantidad: 0` | `400` "encargos.0.cantidad must not be less than 1" |
+| `precio` o `nombre` dentro del encargo | se ignoran: el total sale del catálogo |
+| Sin token | `401` |
 
 ---
 
-### 2.12 `GET /delys/pedidos`
+### 12. `GET /delys/pedidos`
 
 Lista todos los pedidos. Requiere token `delys`. Sin parámetros.
 
@@ -332,7 +301,7 @@ Cada pedido viene con sus encargos y cada encargo con su dulce completo.
 
 ---
 
-### 2.13 `GET /delys/pedidos/:id`
+### 13. `GET /delys/pedidos/:id`
 
 Un pedido. Requiere token `delys`.
 
@@ -353,7 +322,7 @@ Un UUID bien formado pero inexistente da `404`.
 
 ---
 
-### 2.14 `DELETE /delys/pedidos/:id`
+### 14. `DELETE /delys/pedidos/:id`
 
 Borra el pedido. Requiere token `delys`. Mismo parámetro `id` UUID.
 
@@ -365,7 +334,7 @@ curl -X DELETE localhost:3000/delys/pedidos/f9f64eb3-50d6-4748-8ecd-1847b03af017
 
 ---
 
-### 2.15 `POST /delys/dulces/:id/imagen`
+### 15. `POST /delys/dulces/:id/imagen`
 
 Sube la imagen de un dulce a Supabase Storage. Requiere token `delys`. En la base de datos solo queda la URL y el tamaño: el binario no pasa por Postgres ni se escribe en disco (multer lo recibe en memoria).
 
@@ -420,7 +389,7 @@ Subir otra imagen sobre el mismo dulce **reemplaza** la anterior: la vieja se bo
 
 ---
 
-### 2.16 `DELETE /delys/dulces/:id/imagen`
+### 16. `DELETE /delys/dulces/:id/imagen`
 
 Quita la imagen de un dulce. Requiere token `delys`.
 
@@ -444,7 +413,7 @@ El dulce sigue en el catálogo; solo pierde la foto. Es la forma de devolver los
 
 ---
 
-## 3. Cómo probarlo de punta a punta
+## Cómo probarlo de punta a punta
 
 ```bash
 npm run build && npm start

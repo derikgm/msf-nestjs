@@ -26,5 +26,5 @@ export declare class DelysService implements OnApplicationBootstrap {
     obtenerOfertas(): {
         ofertas: import("./interfaces/delys.interfaces.js").Dulce[];
     };
-    private upsertDulce;
+    private dulcesDelCatalogo;
 }

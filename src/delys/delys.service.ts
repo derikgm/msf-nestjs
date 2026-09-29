@@ -6,7 +6,7 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { FindOptionsRelations, Repository } from 'typeorm';
+import { FindOptionsRelations, In, Repository } from 'typeorm';
 import { CreatePedidoDto } from './dto/create-pedido.dto.js';
 import { Dulce, Encargo, Pedido } from './entities/index.js';
 import { ofertas } from './data/ofertas.js';
@@ -37,19 +37,23 @@ export class DelysService implements OnApplicationBootstrap {
     this.logger.log(`Catálogo inicial cargado: ${ofertas.length} dulces`);
   }
 
+  /**
+   * Crea el pedido con los precios del catálogo. El cliente solo manda el id de
+   * cada dulce, así que el total no se puede manipular desde fuera.
+   */
   async crearPedido(createPedidoDto: CreatePedidoDto) {
     const { encargos: encargosDto } = createPedidoDto;
 
-    const dulces = await this.dulceRepo.save(
-      await Promise.all(encargosDto.map((encargo) => this.upsertDulce(encargo.dulce))),
-    );
+    const dulces = await this.dulcesDelCatalogo(encargosDto.map((e) => e.dulce));
 
     let precio_total = 0;
-    const encargos: Encargo[] = encargosDto.map((encargoDto, i) => {
-      precio_total += dulces[i].precio * encargoDto.cantidad;
+    const encargos: Encargo[] = encargosDto.map((encargoDto) => {
+      const dulce = dulces.get(encargoDto.dulce) as Dulce;
+
+      precio_total += dulce.precio * encargoDto.cantidad;
 
       return this.encargoRepo.create({
-        dulce: dulces[i],
+        dulce,
         cantidad: encargoDto.cantidad,
       });
     });
@@ -96,14 +100,25 @@ export class DelysService implements OnApplicationBootstrap {
     return { ofertas };
   }
 
-  /** El DTO trae el dulce completo: si ya existe se actualiza, si no, se inserta. */
-  private async upsertDulce(dto: CreatePedidoDto['encargos'][number]['dulce']) {
-    const dulce = (await this.dulceRepo.findOneBy({ id: dto.id })) ?? this.dulceRepo.create();
+  /**
+   * Carga del catálogo los dulces que pide el encargo, indexados por id. Si algún
+   * id no existe, el pedido se rechaza: así el cliente no puede inventarse un dulce
+   * ni cambiarle el precio a uno que sí existe.
+   */
+  private async dulcesDelCatalogo(ids: number[]) {
+    const encontrados = await this.dulceRepo.findBy({ id: In(ids) });
+    const porId = new Map(encontrados.map((dulce) => [dulce.id, dulce]));
 
-    dulce.id = dto.id;
-    dulce.nombre = dto.nombre;
-    dulce.precio = dto.precio;
+    const faltantes = [...new Set(ids)].filter((id) => !porId.has(id));
 
-    return dulce;
+    if (faltantes.length === 1) {
+      throw new NotFoundException(`No existe el dulce ${faltantes[0]}`);
+    }
+
+    if (faltantes.length > 1) {
+      throw new NotFoundException(`No existen los dulces ${faltantes.join(', ')}`);
+    }
+
+    return porId;
   }
 }

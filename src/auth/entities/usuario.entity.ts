@@ -10,10 +10,16 @@ import {
  * con rol "delys" (la propietaria y su familia) comparten la misma cuota, y los de
  * "domus" la suya. Para un proyecto nuevo ("delys-domicilio") basta con usar el
  * nombre como rol: la columna es varchar para no requerir migraciones.
+ *
+ * "admin" es la excepción: administra la plataforma y entra a cualquier ruta con
+ * `@Roles()` (ver RolesGuard). El resto de roles solo ven lo de su propio proyecto.
  */
-export const ROLES = ['delys', 'domus'] as const;
+export const ROLES = ['delys', 'domus', 'admin'] as const;
 
 export type RolUsuario = (typeof ROLES)[number];
+
+/** Único rol con paso libre: es administración de la plataforma, no un proyecto. */
+export const ROL_SUPERUSUARIO: RolUsuario = 'admin';
 
 @Entity('usuario')
 export class Usuario {

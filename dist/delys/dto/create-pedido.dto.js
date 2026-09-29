@@ -8,38 +8,18 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 import { Type } from 'class-transformer';
-import { IsArray, IsNotEmpty, IsNumber, IsPositive, IsString, Min, ValidateNested, ArrayMinSize, } from 'class-validator';
-export class CreateDulceDto {
-    id;
-    nombre;
-    precio;
-}
-__decorate([
-    IsNumber(),
-    IsPositive(),
-    __metadata("design:type", Number)
-], CreateDulceDto.prototype, "id", void 0);
-__decorate([
-    IsString(),
-    IsNotEmpty(),
-    __metadata("design:type", String)
-], CreateDulceDto.prototype, "nombre", void 0);
-__decorate([
-    IsNumber(),
-    IsPositive(),
-    __metadata("design:type", Number)
-], CreateDulceDto.prototype, "precio", void 0);
+import { IsArray, IsInt, IsPositive, Min, ValidateNested, ArrayMinSize, } from 'class-validator';
 export class CreateEncargoDto {
     dulce;
     cantidad;
 }
 __decorate([
-    ValidateNested(),
-    Type(() => CreateDulceDto),
-    __metadata("design:type", CreateDulceDto)
+    IsInt(),
+    IsPositive(),
+    __metadata("design:type", Number)
 ], CreateEncargoDto.prototype, "dulce", void 0);
 __decorate([
-    IsNumber(),
+    IsInt(),
     Min(1),
     __metadata("design:type", Number)
 ], CreateEncargoDto.prototype, "cantidad", void 0);

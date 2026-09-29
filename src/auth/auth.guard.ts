@@ -2,6 +2,8 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  Logger,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -12,6 +14,8 @@ import { AuthUser, RequestConUsuario } from './auth.interfaces.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(
     private readonly reflector: Reflector,
     private readonly jwtService: JwtService,
@@ -35,28 +39,50 @@ export class JwtAuthGuard implements CanActivate {
       );
     }
 
-    const user = await this.usuarioDelToken(token);
-
-    // En una ruta pública un token malo no estorba: se sigue como anónimo.
-    if (!user) {
+    try {
+      request.user = await this.usuarioDelToken(token);
+    } catch (error) {
+      // En una ruta pública un token malo no estorba: se sigue como anónimo.
       if (esPublica) return true;
 
-      throw new UnauthorizedException('Token inválido, expirado o de un usuario desactivado');
+      throw error;
     }
-
-    request.user = user;
 
     return true;
   }
 
-  private async usuarioDelToken(token: string): Promise<AuthUser | undefined> {
-    try {
-      const user = await this.jwtService.verifyAsync<AuthUser>(token);
+  private async usuarioDelToken(token: string): Promise<AuthUser> {
+    let user: AuthUser;
 
-      // El token puede vivir más que la baja del usuario: lo confirmamos en la DB.
-      return (await this.authService.usuarioActivo(user.sub)) ? user : undefined;
+    try {
+      user = await this.jwtService.verifyAsync<AuthUser>(token);
     } catch {
-      return undefined;
+      // Solo aquí el token es el problema: firma inválida o caducado.
+      throw new UnauthorizedException('El token no es válido o ya caducó');
+    }
+
+    if (!(await this.usuarioSigueActivo(user.sub))) {
+      throw new UnauthorizedException('El usuario de este token ya no está activo');
+    }
+
+    return user;
+  }
+
+  /**
+   * La consulta a la base de datos va con su propio try a propósito. Si compartiera
+   * el catch con la verificación del token, una caída de la base de datos llegaría al
+   * cliente como un 401 y la app cerraría la sesión sin motivo, sin poder distinguir
+   * "tu token venció" de "el servidor no pudo responder".
+   */
+  private async usuarioSigueActivo(id: string): Promise<boolean> {
+    try {
+      return await this.authService.usuarioActivo(id);
+    } catch (error) {
+      this.logger.error(`No se pudo comprobar el usuario ${id} en la base de datos`, error);
+
+      throw new ServiceUnavailableException(
+        'No se puede comprobar la sesión en este momento',
+      );
     }
   }
 

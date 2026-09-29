@@ -17,7 +17,7 @@ export declare class AuthController {
             id: string;
             nombre: string;
             usuario: string;
-            rol: "delys" | "domus";
+            rol: "delys" | "domus" | "admin";
         };
     }>;
     crearUsuario(dto: CreateUsuarioDto, request: RequestConUsuario): Promise<{
@@ -26,7 +26,7 @@ export declare class AuthController {
             id: string;
             nombre: string;
             usuario: string;
-            rol: "delys" | "domus";
+            rol: "delys" | "domus" | "admin";
         };
     }>;
     changePassword(dto: ChangePasswordDto, request: RequestConUsuario): Promise<{

@@ -10,6 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 import { ForbiddenException, Injectable, } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from './roles.decorator.js';
+import { ROL_SUPERUSUARIO } from './entities/index.js';
 let RolesGuard = class RolesGuard {
     reflector;
     constructor(reflector) {
@@ -21,6 +22,8 @@ let RolesGuard = class RolesGuard {
             return true;
         const { user } = context.switchToHttp().getRequest();
         if (!user)
+            return true;
+        if (user.rol === ROL_SUPERUSUARIO)
             return true;
         if (!rolesRequeridos.includes(user.rol)) {
             throw new ForbiddenException(`Necesitas el rol ${rolesRequeridos.join(' o ')} para usar esta ruta`);

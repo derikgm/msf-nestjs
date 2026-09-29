@@ -7,15 +7,17 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Injectable, UnauthorizedException, } from '@nestjs/common';
+var JwtAuthGuard_1;
+import { Injectable, Logger, ServiceUnavailableException, UnauthorizedException, } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { IS_PUBLIC_KEY } from './public.decorator.js';
 import { AuthService } from './auth.service.js';
-let JwtAuthGuard = class JwtAuthGuard {
+let JwtAuthGuard = JwtAuthGuard_1 = class JwtAuthGuard {
     reflector;
     jwtService;
     authService;
+    logger = new Logger(JwtAuthGuard_1.name);
     constructor(reflector, jwtService, authService) {
         this.reflector = reflector;
         this.jwtService = jwtService;
@@ -33,22 +35,36 @@ let JwtAuthGuard = class JwtAuthGuard {
                 return true;
             throw new UnauthorizedException('Falta el token. Envíalo como: Authorization: Bearer <token>');
         }
-        const user = await this.usuarioDelToken(token);
-        if (!user) {
+        try {
+            request.user = await this.usuarioDelToken(token);
+        }
+        catch (error) {
             if (esPublica)
                 return true;
-            throw new UnauthorizedException('Token inválido, expirado o de un usuario desactivado');
+            throw error;
         }
-        request.user = user;
         return true;
     }
     async usuarioDelToken(token) {
+        let user;
         try {
-            const user = await this.jwtService.verifyAsync(token);
-            return (await this.authService.usuarioActivo(user.sub)) ? user : undefined;
+            user = await this.jwtService.verifyAsync(token);
         }
         catch {
-            return undefined;
+            throw new UnauthorizedException('El token no es válido o ya caducó');
+        }
+        if (!(await this.usuarioSigueActivo(user.sub))) {
+            throw new UnauthorizedException('El usuario de este token ya no está activo');
+        }
+        return user;
+    }
+    async usuarioSigueActivo(id) {
+        try {
+            return await this.authService.usuarioActivo(id);
+        }
+        catch (error) {
+            this.logger.error(`No se pudo comprobar el usuario ${id} en la base de datos`, error);
+            throw new ServiceUnavailableException('No se puede comprobar la sesión en este momento');
         }
     }
     extraerToken(header) {
@@ -56,7 +72,7 @@ let JwtAuthGuard = class JwtAuthGuard {
         return tipo?.toLowerCase() === 'bearer' ? token : undefined;
     }
 };
-JwtAuthGuard = __decorate([
+JwtAuthGuard = JwtAuthGuard_1 = __decorate([
     Injectable(),
     __metadata("design:paramtypes", [Reflector,
         JwtService,

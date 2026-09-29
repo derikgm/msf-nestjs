@@ -40,7 +40,7 @@ Cada token lleva un **rol** y hay dos guards: el de autenticación (firma + que 
 
 ### El modelo de usuarios
 
-El rol **es** el proyecto: `delys`, `domus`. No hay un superusuario que vea los dos; cada usuario solo ve lo de su proyecto.
+El rol **es** el proyecto: `delys`, `domus`. No hay un superusuario que vea los dos; cada usuario solo ve lo de su proyecto. La excepción es `admin`: administra la plataforma y `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin tocar los decoradores uno por uno. El aislamiento entre `delys` y `domus` no se toca.
 
 `POST /auth/registro` está abierto mientras el rol esté vacío, que es el arranque de cada proyecto: el primer usuario se registra solo y a partir de ahí el registro se cierra. Para meter más gente en ese proyecto hay que estar autenticado con `@Roles` de ese mismo rol:
 

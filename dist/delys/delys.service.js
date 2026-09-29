@@ -13,7 +13,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 var DelysService_1;
 import { Inject, Injectable, Logger, NotFoundException, } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Dulce, Encargo, Pedido } from './entities/index.js';
 import { ofertas } from './data/ofertas.js';
 const relations = {
@@ -37,12 +37,13 @@ let DelysService = DelysService_1 = class DelysService {
     }
     async crearPedido(createPedidoDto) {
         const { encargos: encargosDto } = createPedidoDto;
-        const dulces = await this.dulceRepo.save(await Promise.all(encargosDto.map((encargo) => this.upsertDulce(encargo.dulce))));
+        const dulces = await this.dulcesDelCatalogo(encargosDto.map((e) => e.dulce));
         let precio_total = 0;
-        const encargos = encargosDto.map((encargoDto, i) => {
-            precio_total += dulces[i].precio * encargoDto.cantidad;
+        const encargos = encargosDto.map((encargoDto) => {
+            const dulce = dulces.get(encargoDto.dulce);
+            precio_total += dulce.precio * encargoDto.cantidad;
             return this.encargoRepo.create({
-                dulce: dulces[i],
+                dulce,
                 cantidad: encargoDto.cantidad,
             });
         });
@@ -73,12 +74,17 @@ let DelysService = DelysService_1 = class DelysService {
     obtenerOfertas() {
         return { ofertas };
     }
-    async upsertDulce(dto) {
-        const dulce = (await this.dulceRepo.findOneBy({ id: dto.id })) ?? this.dulceRepo.create();
-        dulce.id = dto.id;
-        dulce.nombre = dto.nombre;
-        dulce.precio = dto.precio;
-        return dulce;
+    async dulcesDelCatalogo(ids) {
+        const encontrados = await this.dulceRepo.findBy({ id: In(ids) });
+        const porId = new Map(encontrados.map((dulce) => [dulce.id, dulce]));
+        const faltantes = [...new Set(ids)].filter((id) => !porId.has(id));
+        if (faltantes.length === 1) {
+            throw new NotFoundException(`No existe el dulce ${faltantes[0]}`);
+        }
+        if (faltantes.length > 1) {
+            throw new NotFoundException(`No existen los dulces ${faltantes.join(', ')}`);
+        }
+        return porId;
     }
 };
 DelysService = DelysService_1 = __decorate([
