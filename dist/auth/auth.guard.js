@@ -11,32 +11,45 @@ import { Injectable, UnauthorizedException, } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { IS_PUBLIC_KEY } from './public.decorator.js';
+import { AuthService } from './auth.service.js';
 let JwtAuthGuard = class JwtAuthGuard {
     reflector;
     jwtService;
-    constructor(reflector, jwtService) {
+    authService;
+    constructor(reflector, jwtService, authService) {
         this.reflector = reflector;
         this.jwtService = jwtService;
+        this.authService = authService;
     }
     async canActivate(context) {
         const esPublica = this.reflector.getAllAndOverride(IS_PUBLIC_KEY, [
             context.getHandler(),
             context.getClass(),
         ]);
-        if (esPublica)
-            return true;
         const request = context.switchToHttp().getRequest();
-        const token = this.extraerToken(request.headers.authorization);
+        const token = this.extraerToken(request.headers?.authorization);
         if (!token) {
+            if (esPublica)
+                return true;
             throw new UnauthorizedException('Falta el token. Envíalo como: Authorization: Bearer <token>');
         }
+        const user = await this.usuarioDelToken(token);
+        if (!user) {
+            if (esPublica)
+                return true;
+            throw new UnauthorizedException('Token inválido, expirado o de un usuario desactivado');
+        }
+        request.user = user;
+        return true;
+    }
+    async usuarioDelToken(token) {
         try {
-            request.user = await this.jwtService.verifyAsync(token);
+            const user = await this.jwtService.verifyAsync(token);
+            return (await this.authService.usuarioActivo(user.sub)) ? user : undefined;
         }
         catch {
-            throw new UnauthorizedException('Token inválido o expirado');
+            return undefined;
         }
-        return true;
     }
     extraerToken(header) {
         const [tipo, token] = header?.split(' ') ?? [];
@@ -46,7 +59,8 @@ let JwtAuthGuard = class JwtAuthGuard {
 JwtAuthGuard = __decorate([
     Injectable(),
     __metadata("design:paramtypes", [Reflector,
-        JwtService])
+        JwtService,
+        AuthService])
 ], JwtAuthGuard);
 export { JwtAuthGuard };
 //# sourceMappingURL=auth.guard.js.map

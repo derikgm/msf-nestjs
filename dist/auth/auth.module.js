@@ -7,16 +7,20 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './auth.guard.js';
+import { RolesGuard } from './roles.guard.js';
+import { Usuario } from './entities/index.js';
 import { requireEnv } from '../common/utils/env.util.js';
 let AuthModule = class AuthModule {
 };
 AuthModule = __decorate([
     Module({
         imports: [
+            TypeOrmModule.forFeature([Usuario]),
             JwtModule.registerAsync({
                 global: true,
                 inject: [ConfigService],
@@ -29,6 +33,7 @@ AuthModule = __decorate([
         providers: [
             AuthService,
             { provide: APP_GUARD, useClass: JwtAuthGuard },
+            { provide: APP_GUARD, useClass: RolesGuard },
         ],
         exports: [AuthService],
     })

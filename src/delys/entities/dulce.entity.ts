@@ -18,4 +18,14 @@ export class Dulce implements DulceShape {
     transformer: numericTransformer,
   })
   precio: number;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  imagen_url: string | null;
+
+  /**
+   * Tamaño del archivo en Storage. Se guarda para poder liberar la cuota al borrar
+   * la imagen, porque la cuota es un contador, no se puede recalcular.
+   */
+  @Column({ type: 'int', nullable: true })
+  imagen_bytes: number | null;
 }

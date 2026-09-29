@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node"],
+    "types": ["node", "express", "multer"],
     "rootDir": "./src",
     "tsBuildInfoFile": "./dist/tsbuildinfo"
   },

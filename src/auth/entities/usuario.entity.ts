@@ -5,7 +5,13 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-export const ROLES = ['admin', 'operador'] as const;
+/**
+ * Cada rol es un proyecto y tiene su propia cuota de almacenamiento: los usuarios
+ * con rol "delys" (la propietaria y su familia) comparten la misma cuota, y los de
+ * "domus" la suya. Para un proyecto nuevo ("delys-domicilio") basta con usar el
+ * nombre como rol: la columna es varchar para no requerir migraciones.
+ */
+export const ROLES = ['delys', 'domus'] as const;
 
 export type RolUsuario = (typeof ROLES)[number];
 
@@ -28,7 +34,7 @@ export class Usuario {
   @Column({ type: 'varchar', length: 200, select: false })
   password_hash: string;
 
-  @Column({ type: 'enum', enum: ROLES, default: 'operador' })
+  @Column({ type: 'varchar', length: 50, default: 'delys' })
   rol: RolUsuario;
 
   /** Permite quitarle el acceso sin borrar su historial. */

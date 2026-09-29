@@ -13,6 +13,8 @@ let Dulce = class Dulce {
     id;
     nombre;
     precio;
+    imagen_url;
+    imagen_bytes;
 };
 __decorate([
     PrimaryColumn({ type: 'int' }),
@@ -31,6 +33,14 @@ __decorate([
     }),
     __metadata("design:type", Number)
 ], Dulce.prototype, "precio", void 0);
+__decorate([
+    Column({ type: 'varchar', length: 500, nullable: true }),
+    __metadata("design:type", Object)
+], Dulce.prototype, "imagen_url", void 0);
+__decorate([
+    Column({ type: 'int', nullable: true }),
+    __metadata("design:type", Object)
+], Dulce.prototype, "imagen_bytes", void 0);
 Dulce = __decorate([
     Entity('dulce')
 ], Dulce);

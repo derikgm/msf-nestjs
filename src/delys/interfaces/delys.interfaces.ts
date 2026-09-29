@@ -14,6 +14,8 @@ export interface Dulce {
     id: number,
     nombre: string,
     precio: number,
+    /** URL pública del archivo en Supabase Storage; null si el dulce no tiene imagen. */
+    imagen_url: string | null,
 }
 
 export interface Encargo {

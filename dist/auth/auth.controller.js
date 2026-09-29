@@ -10,8 +10,10 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Req, UnauthorizedException, } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
+import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { Public } from './public.decorator.js';
 let AuthController = class AuthController {
@@ -21,6 +23,23 @@ let AuthController = class AuthController {
     }
     login(dto) {
         return this.authService.login(dto);
+    }
+    crearPrimerUsuario(dto, request) {
+        return this.authService.register(dto, request.user);
+    }
+    crearUsuario(dto, request) {
+        return this.authService.crearUsuario(dto, this.usuarioActual(request));
+    }
+    changePassword(dto, request) {
+        return this.authService.changePassword(this.usuarioActual(request), dto);
+    }
+    yo(request) {
+        return this.usuarioActual(request);
+    }
+    usuarioActual(request) {
+        if (!request.user)
+            throw new UnauthorizedException();
+        return request.user;
     }
 };
 __decorate([
@@ -32,6 +51,39 @@ __decorate([
     __metadata("design:paramtypes", [LoginDto]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "login", null);
+__decorate([
+    Public(),
+    Post('registro'),
+    __param(0, Body()),
+    __param(1, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [CreateUsuarioDto, Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "crearPrimerUsuario", null);
+__decorate([
+    Post('usuarios'),
+    __param(0, Body()),
+    __param(1, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [CreateUsuarioDto, Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "crearUsuario", null);
+__decorate([
+    Post('cambiar-password'),
+    HttpCode(200),
+    __param(0, Body()),
+    __param(1, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [ChangePasswordDto, Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "changePassword", null);
+__decorate([
+    Get('yo'),
+    __param(0, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "yo", null);
 AuthController = __decorate([
     Controller('auth'),
     __metadata("design:paramtypes", [AuthService])

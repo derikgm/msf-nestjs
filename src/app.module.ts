@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DelysModule } from './delys/delys.module.js';
 import { ControlModule } from './control/control.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { StorageQuotaModule } from './common/modules/storage-quota/storage-quota.module.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 
@@ -28,6 +29,7 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
     DelysModule,
     ControlModule,
     AuthModule,
+    StorageQuotaModule,
   ],
   controllers: [],
   providers: [],
