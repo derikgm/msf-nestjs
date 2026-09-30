@@ -2,10 +2,21 @@ annotations:
   anybuild.run/config:
     commands:
       start: node server.js
+      # Se declara build explicito y vacio a proposito. Si Wasmer lo omite,
+      # asume por defecto "npm run build", que necesita TypeScript (devDependency)
+      # y no existe en el entorno de Wasmer. Como dist/ ya viene compilado en el
+      # repo, la app solo necesita arrancar con node.
+      build: ""
     edgejs_enable: true
     edgejs_precompile: true
     name: out
-    node_framework: nestjs
+    # Wasmer usa esto para decidir como empaquetar. Ponerlo en "node" evita que
+    # intente compilar NestJS en la nube: el build ya viene hecho en dist/, que
+    # esta versionado. Con "nestjs" Wasmer busca tsc y las herramientas de
+    # desarrollo, que no estan en dependencies y por eso el build falla.
+    node_framework: node
+    # Solo package.json: package-lock.json esta en .gitignore, asi que Wasmer no
+    # lo recibe al clonar. Anadirlo aqui haria que Wasmer fallara al no encontrarlo.
     node_install_inputs:
     - package.json
     node_package_manager: npm
