@@ -41,13 +41,23 @@ let DelysService = DelysService_1 = class DelysService {
         let precio_total = 0;
         const encargos = encargosDto.map((encargoDto) => {
             const dulce = dulces.get(encargoDto.dulce);
+            if (!dulce)
+                throw new NotFoundException(`No existe el dulce ${encargoDto.dulce}`);
             precio_total += dulce.precio * encargoDto.cantidad;
             return this.encargoRepo.create({
                 dulce,
                 cantidad: encargoDto.cantidad,
             });
         });
-        const pedido = await this.pedidoRepo.save(this.pedidoRepo.create({ precio_total, encargos }));
+        const pedido = await this.pedidoRepo.save(this.pedidoRepo.create({
+            precio_total,
+            direccion: createPedidoDto.direccion.trim(),
+            telefono: createPedidoDto.telefono.trim(),
+            fecha: createPedidoDto.fecha,
+            horario: createPedidoDto.horario.trim(),
+            notas: createPedidoDto.notas?.trim() || null,
+            encargos,
+        }));
         return { ok: true, pedido: await this.obtenerPedido(pedido.id) };
     }
     async obtenerTodosDulces() {

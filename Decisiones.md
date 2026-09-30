@@ -3,7 +3,7 @@
 Decisiones ya tomadas y cosas que quedan pendientes antes de producción. Cada una dice **qué** se decidió, **por qué** y **qué falta**.
 La referencia de los endpoints está en [API.md](API.md).
 
-Fecha de la última verificación: 2026-09-29 (`npm run build` en verde, endpoints probados contra la BD real de Supabase).
+Fecha de la última verificación: 2026-09-30 (`npm run build` en verde; validaciones de fecha contra `class-validator` real en UTC, UTC-10 y UTC+14, y migración + creación de pedidos probadas contra PostgreSQL 16 con Docker).
 
 ---
 
@@ -82,10 +82,61 @@ if (user.rol === ROL_SUPERUSUARIO) return true;
 
 ---
 
-### 1.5 Cosas que también hay que hacer antes de producción
+### 1.5 El pedido lleva los datos de entrega y la fecha no puede ser de ayer
+
+**Decisión.** `POST /delys/pedido` recibe, además de los encargos, `direccion`, `telefono`, `fecha`, `horario` y `notas`. La `fecha` es el día de la entrega en `YYYY-MM-DD` y **el servidor rechaza cualquier fecha anterior a hoy**.
+
+```json
+{
+  "direccion": "Calle Reforma 222, Centro",
+  "telefono": "5512345678",
+  "fecha": "2026-10-05",
+  "horario": "10:00 a 14:00",
+  "notas": "Sin azúcar",
+  "encargos": [ { "dulce": 1, "cantidad": 2 } ]
+}
+```
+
+**Qué se cambió.**
+
+* `src/common/utils/fecha.util.ts` (nuevo): el decorador `@IsFechaDeEntrega()`.
+* `src/delys/dto/create-pedido.dto.ts`: los cinco campos con sus reglas. `notas` es el único opcional.
+* `src/delys/entities/pedido.entity.ts`: las cinco columnas.
+* `src/delys/interfaces/delys.interfaces.ts`: `Pedido` refleja las columnas.
+* `src/delys/delys.service.ts`: `crearPedido()` los guarda, con `.trim()` en los textos.
+
+**Por qué se compara el día local y no la fecha completa.** La regla es "no se encarga para ayer", así que la comparación es entre días, sin horas: si hoy ya es tarde, un pedido para hoy sigue aceptándose. Y el día se arma con `new Date(anio, mes - 1, dia)`, no con `Date.parse`, que interpreta el texto como UTC. En una zona como UTC-6 eso convertía "2026-10-01" en el 30 de septiembre local y rechazaba un pedido válido por un día.
+
+**Por qué `fecha` es `date` y no `timestamptz`.** La hora de la entrega va aparte, en `horario`. Guardar la medianoche como timestamp sería un dato falso: el pedido se entrega a cierta hora, no a las 00:00.
+
+**Por qué la fecha tiene su propio validador.** `class-validator` no trae "fecha no pasada". Además el validador distingue los dos fallos, porque no es lo mismo: `2026-02-31` no es una fecha pasada, es una fecha que no existe, y el mensaje lo dice.
+
+**Lo que falta.** `@IsFechaDeEntrega` no comprueba la zona horaria del cliente, solo la del servidor. Si el servidor y los clientes estuvieran en países distintos, el "hoy" del servidor puede no ser el "hoy" del cliente. Para México contra un servidor en UTC no hay diferencia, pero es lo que hay que tener en cuenta si el servidor se mueve al otro lado del meridiano.
+
+---
+
+### 1.6 Las columnas de entrega admiten null aunque el DTO las exija
+
+**Decisión.** `pedido.direccion`, `telefono`, `fecha` y `horario` se declaran `nullable: true` en la entidad, pero `CreatePedidoDto` las exige siempre.
+
+**Por qué.** `synchronize: true` no puede añadir una columna NOT NULL a una tabla que ya tiene filas. Probado contra PostgreSQL 16: con tres pedidos ya guardados, arrancar la app con las columnas NOT NULL falla con
+
+```
+column "direccion" of relation "pedido" contains null values
+```
+
+Con las columnas permeables el `synchronize` las añade y arranca siempre, y los pedidos viejos sobreviven con los cuatro campos a null en vez de perder el historial.
+
+**Lo que queda por hacer.** Cuando se escriban las migraciones y se vacíe la tabla, estas cuatro columnas vuelven a ser NOT NULL. Los tipos de `delys.interfaces.ts` también pasan de `string | null` a `string`, y los clientes Tauri dejan de tolerar el null.
+
+---
+
+### 1.7 Cosas que también hay que hacer antes de producción
 
 No son decisiones, solo recordatorios que quedaron sueltos:
 
 * Falta la `SUPABASE_SERVICE_ROLE_KEY` real en `.env` (ahora está el marcador) y hay que crear los buckets `delys` y `domus` públicos de lectura en el panel de Supabase. Hasta eso, la subida real no se pudo probar: el `503` que devolvía era el guard de credenciales, no un fallo de la lógica.
 * No hay límite de intentos de login (`@nestjs/throttler`) ni log de auditoría.
-* La tabla `storage_quota` se crea sola con `synchronize: true`. Cuando eso se desactive hay que generar la migración de `usuario`, `storage_quota` y la columna `dulce.imagen_bytes` / `dulce.imagen_url`.
+* La tabla `storage_quota` se crea sola con `synchronize: true`. Cuando eso se desactive hay que generar la migración de `usuario`, `storage_quota`, las columnas `dulce.imagen_bytes` / `dulce.imagen_url` y las cinco columnas de entrega de `pedido` (ver 1.6 para volverlas NOT NULL).
+* `StorageQuotaService.decrementarUso()` sigue haciendo leer-y-escribir: dos borrados de imagen a la vez pueden pisarse y la cuota queda desviada. `reservarCuota()` sí está protegido con un `UPDATE` condicional. Cuando se toque eso, `decrementarUso()` debería hacer `SET bytes_usados = GREATEST(bytes_usados - n, 0)` en una sola sentencia.
+* `DelysService.onApplicationBootstrap()` comprueba `count()` y luego inserta. Con dos instancias arrancando a la vez, las dos ven la tabla vacía e insertan el catálogo duplicado. Se arregla con `INSERT ... ON CONFLICT DO NOTHING`.

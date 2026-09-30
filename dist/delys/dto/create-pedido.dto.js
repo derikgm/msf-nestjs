@@ -8,7 +8,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsPositive, Min, ValidateNested, ArrayMinSize, } from 'class-validator';
+import { IsArray, IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, MaxLength, Min, MinLength, ValidateNested, ArrayMinSize, } from 'class-validator';
+import { IsFechaDeEntrega } from '../../common/utils/fecha.util.js';
 export class CreateEncargoDto {
     dulce;
     cantidad;
@@ -24,8 +25,42 @@ __decorate([
     __metadata("design:type", Number)
 ], CreateEncargoDto.prototype, "cantidad", void 0);
 export class CreatePedidoDto {
+    direccion;
+    telefono;
+    fecha;
+    horario;
+    notas;
     encargos;
 }
+__decorate([
+    IsString(),
+    IsNotEmpty(),
+    MaxLength(300),
+    __metadata("design:type", String)
+], CreatePedidoDto.prototype, "direccion", void 0);
+__decorate([
+    IsString(),
+    IsNotEmpty(),
+    MinLength(7, { message: 'El teléfono debe tener al menos 7 caracteres' }),
+    MaxLength(40),
+    __metadata("design:type", String)
+], CreatePedidoDto.prototype, "telefono", void 0);
+__decorate([
+    IsFechaDeEntrega(),
+    __metadata("design:type", String)
+], CreatePedidoDto.prototype, "fecha", void 0);
+__decorate([
+    IsString(),
+    IsNotEmpty(),
+    MaxLength(120),
+    __metadata("design:type", String)
+], CreatePedidoDto.prototype, "horario", void 0);
+__decorate([
+    IsOptional(),
+    IsString(),
+    MaxLength(1000),
+    __metadata("design:type", String)
+], CreatePedidoDto.prototype, "notas", void 0);
 __decorate([
     IsArray(),
     ArrayMinSize(1),

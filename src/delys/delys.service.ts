@@ -48,7 +48,12 @@ export class DelysService implements OnApplicationBootstrap {
 
     let precio_total = 0;
     const encargos: Encargo[] = encargosDto.map((encargoDto) => {
-      const dulce = dulces.get(encargoDto.dulce) as Dulce;
+      const dulce = dulces.get(encargoDto.dulce);
+
+      // dulcesDelCatalogo() ya rechaza los ids que no están. Se repite la comprobación
+      // para que un cambio futuro en esa función no acave en un pedido con un dulce
+      // undefined en vez de con un 404.
+      if (!dulce) throw new NotFoundException(`No existe el dulce ${encargoDto.dulce}`);
 
       precio_total += dulce.precio * encargoDto.cantidad;
 
@@ -59,7 +64,15 @@ export class DelysService implements OnApplicationBootstrap {
     });
 
     const pedido = await this.pedidoRepo.save(
-      this.pedidoRepo.create({ precio_total, encargos }),
+      this.pedidoRepo.create({
+        precio_total,
+        direccion: createPedidoDto.direccion.trim(),
+        telefono: createPedidoDto.telefono.trim(),
+        fecha: createPedidoDto.fecha,
+        horario: createPedidoDto.horario.trim(),
+        notas: createPedidoDto.notas?.trim() || null,
+        encargos,
+      }),
     );
 
     return { ok: true, pedido: await this.obtenerPedido(pedido.id) };

@@ -12,6 +12,11 @@ import { numericTransformer } from '../../common/utils/numeric.transformer.js';
 let Pedido = class Pedido {
     id;
     precio_total;
+    direccion;
+    telefono;
+    fecha;
+    horario;
+    notas;
     encargos;
 };
 __decorate([
@@ -27,6 +32,26 @@ __decorate([
     }),
     __metadata("design:type", Number)
 ], Pedido.prototype, "precio_total", void 0);
+__decorate([
+    Column({ type: 'varchar', length: 300, nullable: true }),
+    __metadata("design:type", Object)
+], Pedido.prototype, "direccion", void 0);
+__decorate([
+    Column({ type: 'varchar', length: 40, nullable: true }),
+    __metadata("design:type", Object)
+], Pedido.prototype, "telefono", void 0);
+__decorate([
+    Column({ type: 'date', nullable: true }),
+    __metadata("design:type", Object)
+], Pedido.prototype, "fecha", void 0);
+__decorate([
+    Column({ type: 'varchar', length: 120, nullable: true }),
+    __metadata("design:type", Object)
+], Pedido.prototype, "horario", void 0);
+__decorate([
+    Column({ type: 'varchar', length: 1000, nullable: true }),
+    __metadata("design:type", Object)
+], Pedido.prototype, "notas", void 0);
 __decorate([
     OneToMany('Encargo', (encargo) => encargo.pedido, { cascade: true }),
     __metadata("design:type", Array)

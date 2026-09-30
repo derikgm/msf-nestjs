@@ -1,5 +1,10 @@
 export interface Pedido {
     id: string;
+    direccion: string | null;
+    telefono: string | null;
+    fecha: string | null;
+    horario: string | null;
+    notas: string | null;
     encargos: Encargo[];
     precio_total: number;
 }

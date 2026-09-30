@@ -10,29 +10,19 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var StorageQuotaService_1;
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ROLES } from '../../auth/entities/index.js';
 import { LIMITE_BYTES_POR_DEFECTO, StorageQuota, } from '../entities/storage-quota.entity.js';
-let StorageQuotaService = StorageQuotaService_1 = class StorageQuotaService {
+let StorageQuotaService = class StorageQuotaService {
     quotaRepo;
-    logger = new Logger(StorageQuotaService_1.name);
     constructor(quotaRepo) {
         this.quotaRepo = quotaRepo;
     }
     async onApplicationBootstrap() {
         for (const rol of ROLES)
             await this.asegurarRol(rol);
-    }
-    async getUsoActual(rol) {
-        const registro = await this.asegurarRol(rol);
-        return registro.bytes_usados;
-    }
-    async getLimite(rol) {
-        const registro = await this.asegurarRol(rol);
-        return registro.limite_bytes;
     }
     async getResumen(rol) {
         const { bytes_usados, limite_bytes } = await this.asegurarRol(rol);
@@ -43,21 +33,11 @@ let StorageQuotaService = StorageQuotaService_1 = class StorageQuotaService {
             bytes_disponibles: Math.max(limite_bytes - bytes_usados, 0),
         };
     }
-    async incrementarUso(rol, bytes) {
-        this.comprobarBytes(bytes);
-        await this.asegurarRol(rol);
-        await this.quotaRepo.increment({ rol }, 'bytes_usados', bytes);
-    }
     async decrementarUso(rol, bytes) {
         this.comprobarBytes(bytes);
         const registro = await this.asegurarRol(rol);
         const restantes = Math.max(registro.bytes_usados - bytes, 0);
         await this.quotaRepo.update({ rol }, { bytes_usados: restantes });
-    }
-    async validarCuota(rol, bytesNuevos) {
-        this.comprobarBytes(bytesNuevos);
-        const { bytes_usados, limite_bytes } = await this.asegurarRol(rol);
-        return bytes_usados + bytesNuevos <= limite_bytes;
     }
     async reservarCuota(rol, bytes) {
         this.comprobarBytes(bytes);
@@ -83,7 +63,7 @@ let StorageQuotaService = StorageQuotaService_1 = class StorageQuotaService {
         }
     }
 };
-StorageQuotaService = StorageQuotaService_1 = __decorate([
+StorageQuotaService = __decorate([
     Injectable(),
     __param(0, Inject(getRepositoryToken(StorageQuota))),
     __metadata("design:paramtypes", [Repository])

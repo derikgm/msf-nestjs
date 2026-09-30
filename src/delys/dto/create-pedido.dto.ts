@@ -2,11 +2,17 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsInt,
+  IsNotEmpty,
+  IsOptional,
   IsPositive,
+  IsString,
+  MaxLength,
   Min,
+  MinLength,
   ValidateNested,
   ArrayMinSize,
 } from 'class-validator';
+import { IsFechaDeEntrega } from '../../common/utils/fecha.util.js';
 
 export class CreateEncargoDto {
   /**
@@ -23,7 +29,40 @@ export class CreateEncargoDto {
   cantidad: number;
 }
 
+//Un pedido no es mas que la suma de varios encargos
 export class CreatePedidoDto {
+  /** Dónde se entrega el pedido. */
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(300)
+  direccion: string;
+
+  /** Teléfono de contacto para la entrega. */
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(7, { message: 'El teléfono debe tener al menos 7 caracteres' })
+  @MaxLength(40)
+  telefono: string;
+
+  /**
+   * Día de la entrega, en `YYYY-MM-DD`. La hora no va aquí sino en `horario`, y no
+   * se acepta una fecha anterior a hoy: un pedido para ayer ya no se puede hacer.
+   */
+  @IsFechaDeEntrega()
+  fecha: string;
+
+  /** Franja horaria de entrega, tal cual la escribe el cliente ("10:00 a 14:00"). */
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  horario: string;
+
+  /** Indicaciones del pedido. Opcional: la base de datos lo admite como null. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  notas?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

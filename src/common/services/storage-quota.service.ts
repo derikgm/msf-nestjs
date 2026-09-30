@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ROLES } from '../../auth/entities/index.js';
@@ -16,8 +16,6 @@ export interface ResumenCuota {
 
 @Injectable()
 export class StorageQuotaService implements OnApplicationBootstrap {
-  private readonly logger = new Logger(StorageQuotaService.name);
-
   constructor(
     @Inject(getRepositoryToken(StorageQuota))
     private readonly quotaRepo: Repository<StorageQuota>,
@@ -26,18 +24,6 @@ export class StorageQuotaService implements OnApplicationBootstrap {
   /** Crea las cuotas de los proyectos conocidos para que su límite sea editable. */
   async onApplicationBootstrap() {
     for (const rol of ROLES) await this.asegurarRol(rol);
-  }
-
-  async getUsoActual(rol: string): Promise<number> {
-    const registro = await this.asegurarRol(rol);
-
-    return registro.bytes_usados;
-  }
-
-  async getLimite(rol: string): Promise<number> {
-    const registro = await this.asegurarRol(rol);
-
-    return registro.limite_bytes;
   }
 
   async getResumen(rol: string): Promise<ResumenCuota> {
@@ -51,13 +37,6 @@ export class StorageQuotaService implements OnApplicationBootstrap {
     };
   }
 
-  async incrementarUso(rol: string, bytes: number): Promise<void> {
-    this.comprobarBytes(bytes);
-    await this.asegurarRol(rol);
-
-    await this.quotaRepo.increment({ rol }, 'bytes_usados', bytes);
-  }
-
   async decrementarUso(rol: string, bytes: number): Promise<void> {
     this.comprobarBytes(bytes);
 
@@ -65,14 +44,6 @@ export class StorageQuotaService implements OnApplicationBootstrap {
     const restantes = Math.max(registro.bytes_usados - bytes, 0);
 
     await this.quotaRepo.update({ rol }, { bytes_usados: restantes });
-  }
-
-  /** ¿Caben `bytesNuevos` en la cuota del rol? */
-  async validarCuota(rol: string, bytesNuevos: number): Promise<boolean> {
-    this.comprobarBytes(bytesNuevos);
-    const { bytes_usados, limite_bytes } = await this.asegurarRol(rol);
-
-    return bytes_usados + bytesNuevos <= limite_bytes;
   }
 
   /**
