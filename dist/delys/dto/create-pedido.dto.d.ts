@@ -6,7 +6,6 @@ export declare class CreatePedidoDto {
     direccion: string;
     telefono: string;
     fecha: string;
-    horario: string;
     notas?: string;
     encargos: CreateEncargoDto[];
 }

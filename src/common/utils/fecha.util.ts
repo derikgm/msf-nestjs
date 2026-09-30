@@ -1,6 +1,6 @@
 import { registerDecorator, ValidationArguments, ValidationOptions } from 'class-validator';
 
-/** `YYYY-MM-DD`: la fecha de entrega no lleva hora, el horario va en su propio campo. */
+/** `YYYY-MM-DD`: la fecha de entrega es solo el día, sin hora ni zona horaria. */
 const FORMATO_FECHA = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**

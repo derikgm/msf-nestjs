@@ -54,7 +54,6 @@ let DelysService = DelysService_1 = class DelysService {
             direccion: createPedidoDto.direccion.trim(),
             telefono: createPedidoDto.telefono.trim(),
             fecha: createPedidoDto.fecha,
-            horario: createPedidoDto.horario.trim(),
             notas: createPedidoDto.notas?.trim() || null,
             encargos,
         }));

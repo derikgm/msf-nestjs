@@ -2,3 +2,14 @@ node_modules/
 package-lock.json
 .env
 tsbuildinfo
+
+# Clientes de la API (Delys, Domus...). Cada uno es su propio repo, se clonan
+# dentro de esta carpeta y no se versionan aquí.
+#
+# Se ignora el CONTENIDO y no la carpeta: si se escribiera `frontends/`, git
+# excluiría el directorio entero y ninguna regla `!` podría re-incluir algo
+# dentro (no se puede re-incluir un archivo si su directorio padre está
+# excluido). Así el README sí se versiona y la carpeta se ve en el explorador,
+# pero ningún frontend entra al repo.
+frontends/**
+!frontends/README.md

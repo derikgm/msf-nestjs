@@ -28,7 +28,6 @@ export class CreatePedidoDto {
     direccion;
     telefono;
     fecha;
-    horario;
     notas;
     encargos;
 }
@@ -49,12 +48,6 @@ __decorate([
     IsFechaDeEntrega(),
     __metadata("design:type", String)
 ], CreatePedidoDto.prototype, "fecha", void 0);
-__decorate([
-    IsString(),
-    IsNotEmpty(),
-    MaxLength(120),
-    __metadata("design:type", String)
-], CreatePedidoDto.prototype, "horario", void 0);
 __decorate([
     IsOptional(),
     IsString(),

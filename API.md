@@ -249,10 +249,9 @@ Crea un pedido. Requiere token con rol `delys`.
 | `direccion` | string | obligatorio, no vacío, máx. 300 caracteres |
 | `telefono` | string | obligatorio, no vacío, de 7 a 40 caracteres |
 | `fecha` | string | obligatorio, `YYYY-MM-DD`, no puede ser anterior a hoy |
-| `horario` | string | obligatorio, no vacío, máx. 120 caracteres. Texto libre ("10:00 a 14:00") |
 | `notas` | string | opcional, máx. 1000 caracteres. Si no viene o viene en blanco se guarda como `null` |
 | `encargos` | array | obligatorio, mínimo 1 elemento |
-| `encargos[].dulce` | number | entero positivo. Es la clave primaria del catálogo |
+| `encargos[].dulce` | number | entero positivo. Es la clave primaria del catálogo. **Ojo: el nombre del campo es `dulce`, no `dulce_id`** |
 | `encargos[].cantidad` | number | entero, mínimo 1 |
 
 ```bash
@@ -263,7 +262,6 @@ curl -X POST localhost:3000/delys/pedido \
         "direccion": "Calle Reforma 222, Centro",
         "telefono": "5512345678",
         "fecha": "2026-10-05",
-        "horario": "10:00 a 14:00",
         "notas": "Sin azúcar",
         "encargos": [
           { "dulce": 1, "cantidad": 2 },
@@ -281,7 +279,6 @@ curl -X POST localhost:3000/delys/pedido \
     "direccion": "Calle Reforma 222, Centro",
     "telefono": "5512345678",
     "fecha": "2026-10-05",
-    "horario": "10:00 a 14:00",
     "notas": "Sin azúcar",
     "encargos": [
       { "id": "2ae13797-...", "dulce": { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "imagen_bytes": null }, "cantidad": 2 },
@@ -303,11 +300,11 @@ curl -X POST localhost:3000/delys/pedido \
 | `precio` o `nombre` dentro del encargo | se ignoran: el total sale del catálogo |
 | `precio_total` o `id` en el body | se ignoran: los pone el servidor |
 | `fecha` de ayer o anterior | `400` "fecha no puede ser una fecha pasada; usa hoy o una posterior" |
-| `fecha` de hoy o posterior | correcto, aunque falte el campo `horario` en la misma hora |
+| `fecha` de hoy o posterior | correcto (hoy mismo sigue aceptándose aunque ya sea tarde) |
 | `fecha: "2026-02-31"`, fecha que no existe | `400` "fecha debe ser una fecha de la forma YYYY-MM-DD" |
 | `fecha: "05/10/2026"`, formato otro | `400` "fecha debe ser una fecha de la forma YYYY-MM-DD" |
 | `fecha: "2026-10-05T10:00:00Z"`, con hora | `400` "fecha debe ser una fecha de la forma YYYY-MM-DD" |
-| sin `direccion` / `telefono` / `fecha` / `horario` | `400` |
+| sin `direccion` / `telefono` / `fecha` | `400` |
 | `telefono: "123"` (menos de 7) | `400` "El teléfono debe tener al menos 7 caracteres" |
 | sin `notas` | correcto, se guarda `null` |
 | Sin token | `401` |
@@ -320,12 +317,12 @@ Lista todos los pedidos. Requiere token `delys`. Sin parámetros.
 
 ```bash
 curl localhost:3000/delys/pedidos -H "Authorization: Bearer eyJ..."
-# -> { "pedidos": [ { "id": "f9f64eb3-...", "precio_total": 7500, "direccion": "...", "telefono": "...", "fecha": "2026-10-05", "horario": "...", "notas": null, "encargos": [ ... ] } ] }
+# -> { "pedidos": [ { "id": "f9f64eb3-...", "precio_total": 7500, "direccion": "...", "telefono": "...", "fecha": "2026-10-05", "notas": null, "encargos": [ ... ] } ] }
 ```
 
 Cada pedido viene con sus encargos y cada encargo con su dulce completo.
 
-`direccion`, `telefono`, `fecha` y `horario` salen como `null` en los pedidos creados antes de que existieran estos campos. El cliente tiene que tolerarlos.
+`direccion`, `telefono` y `fecha` salen como `null` en los pedidos creados antes de que existieran estos campos. El cliente tiene que tolerarlos.
 
 ---
 
@@ -333,7 +330,7 @@ Cada pedido viene con sus encargos y cada encargo con su dulce completo.
 
 Un pedido. Requiere token `delys`.
 
-Los mismos campos que en el listado, más `id`. `null` en los cuatro datos de entrega si el pedido es anterior a estos campos.
+Los mismos campos que en el listado, más `id`. `null` en los tres datos de entrega si el pedido es anterior a estos campos.
 
 | Parámetro | Tipo | Reglas |
 | --- | --- | --- |

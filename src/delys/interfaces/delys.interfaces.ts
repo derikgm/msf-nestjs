@@ -15,8 +15,6 @@ export interface Pedido {
     telefono: string | null,
     /** Día de la entrega en `YYYY-MM-DD`. */
     fecha: string | null,
-    /** Franja horaria de entrega, tal como la escribió el cliente. */
-    horario: string | null,
     /** Indicaciones del pedido; null si el cliente no mandó ninguna. */
     notas: string | null,
     encargos: Encargo [],

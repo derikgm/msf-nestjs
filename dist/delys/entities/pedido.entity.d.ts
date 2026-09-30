@@ -5,7 +5,6 @@ export declare class Pedido implements PedidoShape {
     direccion: string | null;
     telefono: string | null;
     fecha: string | null;
-    horario: string | null;
     notas: string | null;
     encargos: Encargo[];
 }

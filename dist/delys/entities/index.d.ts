@@ -4,4 +4,4 @@ import { Pedido } from './pedido.entity.js';
 export { Dulce } from './dulce.entity.js';
 export { Encargo } from './encargo.entity.js';
 export { Pedido } from './pedido.entity.js';
-export declare const entities: (typeof Pedido | typeof Dulce | typeof Encargo)[];
+export declare const entities: (typeof Pedido | typeof Encargo | typeof Dulce)[];

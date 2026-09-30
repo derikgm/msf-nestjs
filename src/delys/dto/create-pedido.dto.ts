@@ -45,17 +45,11 @@ export class CreatePedidoDto {
   telefono: string;
 
   /**
-   * Día de la entrega, en `YYYY-MM-DD`. La hora no va aquí sino en `horario`, y no
-   * se acepta una fecha anterior a hoy: un pedido para ayer ya no se puede hacer.
+   * Día de la entrega, en `YYYY-MM-DD`. No se acepta una fecha anterior a hoy:
+   * un pedido para ayer ya no se puede hacer.
    */
   @IsFechaDeEntrega()
   fecha: string;
-
-  /** Franja horaria de entrega, tal cual la escribe el cliente ("10:00 a 14:00"). */
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
-  horario: string;
 
   /** Indicaciones del pedido. Opcional: la base de datos lo admite como null. */
   @IsOptional()

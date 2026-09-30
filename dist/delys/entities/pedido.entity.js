@@ -15,7 +15,6 @@ let Pedido = class Pedido {
     direccion;
     telefono;
     fecha;
-    horario;
     notas;
     encargos;
 };
@@ -44,10 +43,6 @@ __decorate([
     Column({ type: 'date', nullable: true }),
     __metadata("design:type", Object)
 ], Pedido.prototype, "fecha", void 0);
-__decorate([
-    Column({ type: 'varchar', length: 120, nullable: true }),
-    __metadata("design:type", Object)
-], Pedido.prototype, "horario", void 0);
 __decorate([
     Column({ type: 'varchar', length: 1000, nullable: true }),
     __metadata("design:type", Object)
