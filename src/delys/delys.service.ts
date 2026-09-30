@@ -1,93 +1,136 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import {  CreatePedidoDto } from './dto/create-pedido.dto.js';
-import { Dulce, Encargo, Pedido } from './interfaces/delys.interfaces.js';
-import { randomUUID } from 'crypto';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { FindOptionsRelations, In, Repository } from 'typeorm';
+import { CreatePedidoDto } from './dto/create-pedido.dto.js';
+import { Dulce, Encargo, Pedido } from './entities/index.js';
 import { ofertas } from './data/ofertas.js';
-import { ConfigService } from '@nestjs/config';
-import { Database } from '@sqlitecloud/drivers';
-import { toPlainArray } from '../common/utils/rowset.util.js';
+
+/** Los encargos siempre llegan con su dulce: es lo que exige la interfaz. */
+const relations = {
+  encargos: { dulce: true },
+} satisfies FindOptionsRelations<Pedido>;
 
 @Injectable()
-export class DelysService {
-  private db: Database
+export class DelysService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(DelysService.name);
 
-  pedidos: Pedido[] = [];
-  dulces: Dulce[] = ofertas;
+  constructor(
+    @Inject(getRepositoryToken(Pedido))
+    private readonly pedidoRepo: Repository<Pedido>,
+    @Inject(getRepositoryToken(Encargo))
+    private readonly encargoRepo: Repository<Encargo>,
+    @Inject(getRepositoryToken(Dulce))
+    private readonly dulceRepo: Repository<Dulce>,
+  ) {}
 
-  constructor(private configService: ConfigService){
-    //TODO: buscar como cambiar esto a algo que funcione mejor
-    this.db = new Database(configService.get(`SQLITECLOUD_URL`)!);
+  /** Carga el catálogo inicial de dulces la primera vez que se levanta la app. */
+  async onApplicationBootstrap() {
+    if ((await this.dulceRepo.count()) > 0) return;
+
+    await this.dulceRepo.save(this.dulceRepo.create(ofertas));
+    this.logger.log(`Catálogo inicial cargado: ${ofertas.length} dulces`);
   }
 
-  agregarEncargo(createPedidoDto: CreatePedidoDto) {
-    const { encargos } = createPedidoDto;
+  /**
+   * Crea el pedido con los precios del catálogo. El cliente solo manda el id de
+   * cada dulce, así que el total no se puede manipular desde fuera.
+   */
+  async crearPedido(createPedidoDto: CreatePedidoDto) {
+    const { encargos: encargosDto } = createPedidoDto;
+
+    const dulces = await this.dulcesDelCatalogo(encargosDto.map((e) => e.dulce));
 
     let precio_total = 0;
-    const encargosMapeados: Encargo[] = encargos.map((e) => {
-      const subtotal = e.dulce.precio * e.cantidad;
-      precio_total += subtotal;
+    const encargos: Encargo[] = encargosDto.map((encargoDto) => {
+      const dulce = dulces.get(encargoDto.dulce);
 
-      return {
-        dulce: {
-          id: e.dulce.id,
-          nombre: e.dulce.nombre,
-          precio: e.dulce.precio,
-        },
-        cantidad: e.cantidad,
-      };
+      // dulcesDelCatalogo() ya rechaza los ids que no están. Se repite la comprobación
+      // para que un cambio futuro en esa función no acave en un pedido con un dulce
+      // undefined en vez de con un 404.
+      if (!dulce) throw new NotFoundException(`No existe el dulce ${encargoDto.dulce}`);
+
+      precio_total += dulce.precio * encargoDto.cantidad;
+
+      return this.encargoRepo.create({
+        dulce,
+        cantidad: encargoDto.cantidad,
+      });
     });
 
-    const pedido: Pedido = {
-      id: randomUUID(), // o el generador que uses
-      encargos: encargosMapeados,
-      precio_total,
-    };
+    const pedido = await this.pedidoRepo.save(
+      this.pedidoRepo.create({
+        precio_total,
+        direccion: createPedidoDto.direccion.trim(),
+        telefono: createPedidoDto.telefono.trim(),
+        fecha: createPedidoDto.fecha,
+        notas: createPedidoDto.notas?.trim() || null,
+        encargos,
+      }),
+    );
 
-    this.pedidos.push(pedido);
-
-    return { ok: true, pedido };
+    return { ok: true, pedido: await this.obtenerPedido(pedido.id) };
   }
 
   async obtenerTodosDulces() {
-    try {
-      const data = await this.db.sql(`SELECT * FROM dulce`);
+    const dulces = await this.dulceRepo.find({ order: { id: 'ASC' } });
 
-      const dulces = toPlainArray<Dulce>(data);
-
-      return {dulces};
-    } catch (e) {
-      console.log("Un error ocurrio: ", e)
-    }
+    return { dulces };
   }
 
   async obtenerTodosPedidos() {
-    // const data = await this.db.sql(`SELECT * FROM dulce`);
+    const pedidos = await this.pedidoRepo.find({ relations });
 
-    // const dulces = toPlainArray<Dulce>(data);
-
-    // return {dulces};
+    return { pedidos };
   }
 
-  obtenerEncargo(id: string) {
-    const encargo = this.pedidos.find(e => e.id == id);
+  async obtenerPedido(id: string) {
+    const pedido = await this.pedidoRepo.findOne({ where: { id }, relations });
 
-    if(!encargo)
-      throw new NotFoundException();
+    if (!pedido) throw new NotFoundException(`No existe el pedido ${id}`);
 
-    return encargo;
+    return pedido;
   }
 
-  remove(id: string) {
-    this.obtenerEncargo(id);
+  async remove(id: string) {
+    const pedido = await this.pedidoRepo.findOneBy({ id });
 
-    this.pedidos = this.pedidos.filter(e => !(e.id == id))
+    if (!pedido) throw new NotFoundException(`No existe el pedido ${id}`);
 
-    return {ok: true};
+    await this.pedidoRepo.remove(pedido);
+
+    return { ok: true };
   }
 
   //Seccion de ofertas:
   obtenerOfertas() {
-    return `Seccion de ofertas...`;
+    return { ofertas };
   }
 
+  /**
+   * Carga del catálogo los dulces que pide el encargo, indexados por id. Si algún
+   * id no existe, el pedido se rechaza: así el cliente no puede inventarse un dulce
+   * ni cambiarle el precio a uno que sí existe.
+   */
+  private async dulcesDelCatalogo(ids: number[]) {
+    const encontrados = await this.dulceRepo.findBy({ id: In(ids) });
+    const porId = new Map(encontrados.map((dulce) => [dulce.id, dulce]));
+
+    const faltantes = [...new Set(ids)].filter((id) => !porId.has(id));
+
+    if (faltantes.length === 1) {
+      throw new NotFoundException(`No existe el dulce ${faltantes[0]}`);
+    }
+
+    if (faltantes.length > 1) {
+      throw new NotFoundException(`No existen los dulces ${faltantes.join(', ')}`);
+    }
+
+    return porId;
+  }
 }

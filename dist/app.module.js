@@ -7,7 +7,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import { Module } from '@nestjs/common';
 import { DelysModule } from './delys/delys.module.js';
 import { ControlModule } from './control/control.module.js';
-import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './auth/auth.module.js';
+import { StorageQuotaModule } from './common/modules/storage-quota/storage-quota.module.js';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -16,7 +19,25 @@ AppModule = __decorate([
             ConfigModule.forRoot({
                 isGlobal: true,
             }),
-            DelysModule, ControlModule
+            TypeOrmModule.forRootAsync({
+                imports: [ConfigModule],
+                inject: [ConfigService],
+                useFactory: (configService) => ({
+                    type: 'postgres',
+                    url: configService.get('DATABASE_URL'),
+                    autoLoadEntities: true,
+                    synchronize: true,
+                    ssl: {
+                        rejectUnauthorized: false,
+                    },
+                    connectTimeoutMS: 30000,
+                    uuidExtension: 'pgcrypto',
+                }),
+            }),
+            DelysModule,
+            ControlModule,
+            AuthModule,
+            StorageQuotaModule,
         ],
         controllers: [],
         providers: [],

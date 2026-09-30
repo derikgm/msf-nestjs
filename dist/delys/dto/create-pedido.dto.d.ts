@@ -1,12 +1,11 @@
-export declare class CreateDulceDto {
-    id: number;
-    nombre: string;
-    precio: number;
-}
 export declare class CreateEncargoDto {
-    dulce: CreateDulceDto;
+    dulce: number;
     cantidad: number;
 }
 export declare class CreatePedidoDto {
+    direccion: string;
+    telefono: string;
+    fecha: string;
+    notas?: string;
     encargos: CreateEncargoDto[];
 }

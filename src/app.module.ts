@@ -1,14 +1,36 @@
 import { Module } from '@nestjs/common';
 import { DelysModule } from './delys/delys.module.js';
 import { ControlModule } from './control/control.module.js';
-import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './auth/auth.module.js';
+import { StorageQuotaModule } from './common/modules/storage-quota/storage-quota.module.js';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // Hace que ConfigService esté disponible en toda la app
+      isGlobal: true,
     }),
-    DelysModule, ControlModule],
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService): TypeOrmModuleOptions => ({
+        type: 'postgres',
+        url: configService.get<string>('DATABASE_URL'), // 👈 Usar cadena de conexión completa
+        autoLoadEntities: true,
+        synchronize: true,
+        ssl: {
+          rejectUnauthorized: false,
+        },
+        connectTimeoutMS: 30000,
+        uuidExtension: 'pgcrypto', // para que los ids uuid se generen en Postgres
+      }),
+    }),
+    DelysModule,
+    ControlModule,
+    AuthModule,
+    StorageQuotaModule,
+  ],
   controllers: [],
   providers: [],
 })

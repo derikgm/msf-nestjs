@@ -1,8 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node"],
-    "rootDir": "./src"
+    "types": ["node", "express", "multer"],
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./dist/tsbuildinfo"
   },
   "include": ["src"],
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]

@@ -1,0 +1,148 @@
+import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { JwtService } from '@nestjs/jwt';
+import { Repository } from 'typeorm';
+import { ChangePasswordDto } from './dto/change-password.dto.js';
+import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
+import { LoginDto } from './dto/login.dto.js';
+import { Usuario, type RolUsuario } from './entities/index.js';
+import { AuthUser } from './auth.interfaces.js';
+import { HASH_FICTICIO, hashPassword, verifyPassword } from './password.util.js';
+import { parseDurationToSeconds } from '../common/utils/duration.util.js';
+
+@Injectable()
+export class AuthService {
+  private readonly expiresIn: number;
+
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+    @Inject(getRepositoryToken(Usuario))
+    private readonly usuarioRepo: Repository<Usuario>,
+  ) {
+    this.expiresIn = parseDurationToSeconds(
+      config.get<string>('AUTH_JWT_EXPIRES_IN') ?? '8h',
+    );
+  }
+
+  /** Valida la contraseña contra la base de datos y devuelve un token. */
+  async login(dto: LoginDto) {
+    const usuario = await this.buscarPorNombre(dto.usuario);
+    const passwordOk = verifyPassword(
+      dto.password,
+      usuario?.password_hash ?? HASH_FICTICIO,
+    );
+
+    if (!usuario || !passwordOk || !usuario.activo) {
+      throw new UnauthorizedException('Usuario o contraseña incorrectos');
+    }
+
+    return {
+      access_token: await this.jwtService.signAsync({
+        sub: usuario.id,
+        usuario: usuario.usuario,
+        rol: usuario.rol,
+      }),
+      token_type: 'Bearer',
+      expires_in: this.expiresIn,
+    };
+  }
+
+  /**
+   * Alta de usuarios.
+   *
+   * - Mientras un rol no tenga ningún usuario, cualquiera puede crear su primer
+   *   usuario (así el proyecto arranca sin necesitar una clave en el servidor).
+   * - Si el rol ya existe, hace falta token: ver crearUsuario().
+   */
+  async register(dto: CreateUsuarioDto, caller?: AuthUser) {
+    const rol = caller?.rol ?? dto.rol ?? 'delys';
+    const yaHayUsuarios = await this.hayUsuariosDelRol(rol);
+
+    if (yaHayUsuarios && caller?.rol !== rol) {
+      throw new UnauthorizedException(
+        'El registro está cerrado: pídele a un usuario de ese rol que te cree la cuenta',
+      );
+    }
+
+    return this.crear(dto, rol);
+  }
+
+  /** Crea un usuario dentro del propio rol del que llama. */
+  async crearUsuario(dto: CreateUsuarioDto, caller: AuthUser) {
+    return this.crear(dto, caller.rol);
+  }
+
+  /** Cada usuario cambia su propia contraseña. */
+  async changePassword(caller: AuthUser, dto: ChangePasswordDto) {
+    const usuario = await this.buscarPorId(caller.sub);
+
+    if (!usuario) throw new UnauthorizedException('El usuario ya no existe');
+
+    if (!verifyPassword(dto.password_actual, usuario.password_hash)) {
+      throw new UnauthorizedException('La contraseña actual es incorrecta');
+    }
+
+    usuario.password_hash = hashPassword(dto.password_nueva);
+
+    await this.usuarioRepo.save(usuario);
+
+    return { mensaje: 'Contraseña actualizada correctamente' };
+  }
+
+  /** El guard lo consulta en cada petición: un usuario desactivado pierde el acceso al instante. */
+  async usuarioActivo(id: string) {
+    return this.usuarioRepo.existsBy({ id, activo: true });
+  }
+
+  private async crear(dto: CreateUsuarioDto, rol: RolUsuario) {
+    const usuario = dto.usuario.trim().toLowerCase();
+
+    if (await this.usuarioRepo.existsBy({ usuario })) {
+      throw new ConflictException('Ese nombre de usuario ya existe');
+    }
+
+    const nuevo = await this.usuarioRepo.save(
+      this.usuarioRepo.create({
+        nombre: dto.nombre.trim(),
+        usuario,
+        password_hash: hashPassword(dto.password),
+        rol,
+      }),
+    );
+
+    return {
+      mensaje: 'Usuario creado correctamente',
+      usuario: {
+        id: nuevo.id,
+        nombre: nuevo.nombre,
+        usuario: nuevo.usuario,
+        rol: nuevo.rol,
+      },
+    };
+  }
+
+  private async buscarPorNombre(usuario: string) {
+    // addSelect: password_hash es select:false y no viene en la consulta por defecto.
+    return this.usuarioRepo
+      .createQueryBuilder('usuario')
+      .addSelect('usuario.password_hash')
+      .where('usuario.usuario = :usuario', {
+        usuario: usuario.trim().toLowerCase(),
+      })
+      .getOne();
+  }
+
+  private async buscarPorId(id: string) {
+    return this.usuarioRepo
+      .createQueryBuilder('usuario')
+      .addSelect('usuario.password_hash')
+      .where('usuario.id = :id', { id })
+      .getOne();
+  }
+
+  private async hayUsuariosDelRol(rol: RolUsuario) {
+    return this.usuarioRepo.existsBy({ rol });
+  }
+}

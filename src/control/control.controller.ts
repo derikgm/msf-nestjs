@@ -1,13 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ControlService } from './control.service.js';
+import { Public } from '../auth/public.decorator.js';
 
 @Controller()
 export class ControlController {
   constructor(private readonly controlService: ControlService) {}
 
-  @Get("ping")
+  @Public()
+  @Get('ping')
   ping() {
     return this.controlService.ping();
   }
-
 }
