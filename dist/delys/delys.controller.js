@@ -102,7 +102,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], DelysController.prototype, "eliminarImagen", null);
 __decorate([
-    Roles('delys'),
+    Public(),
     Post('pedido'),
     __param(0, Body()),
     __metadata("design:type", Function),

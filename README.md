@@ -34,7 +34,8 @@ Cada token lleva un **rol** y hay dos guards: el de autenticación (firma + que 
 | --- | --- |
 | `GET /ping`, `GET /delys/dulces`, `GET /delys/ofertas`, `POST /auth/login` | público |
 | `POST /auth/registro` | público **solo** mientras el rol no tenga ningún usuario |
-| `POST /delys/pedido`, `GET /delys/pedidos`, `GET /delys/pedidos/:id`, `DELETE /delys/pedidos/:id` | `delys` |
+| `POST /delys/pedido` | **público** (el cliente no tiene cuenta) |
+| `GET /delys/pedidos`, `GET /delys/pedidos/:id`, `DELETE /delys/pedidos/:id` | `delys` |
 | `POST /delys/dulces/:id/imagen`, `DELETE /delys/dulces/:id/imagen` | `delys` |
 | `POST /auth/usuarios`, `POST /auth/cambiar-password`, `GET /auth/yo`, `GET /storage/quota` | el que sea |
 

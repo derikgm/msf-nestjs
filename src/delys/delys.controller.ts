@@ -91,8 +91,10 @@ export class DelysController {
     return this.imagenService.eliminar(id, this.usuarioActual(request));
   }
 
-  // Pedidos: JwtAuthGuard + @Roles('delys').
-  @Roles('delys')
+  // Alta de pedidos: pública. El cliente de la pastelería no tiene cuenta, así que
+  // no puede llevar token; el resto de rutas de pedidos sí lo exigen, porque esas
+  // son las del panel (ver, borrar). Pendiente: @nestjs/throttler en esta ruta.
+  @Public()
   @Post('pedido')
   agregarPedido(@Body() createPedidoDto: CreatePedidoDto) {
     return this.delysService.crearPedido(createPedidoDto);

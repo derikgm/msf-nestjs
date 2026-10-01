@@ -2,53 +2,50 @@
 
 Pendientes y cosas que hay que arreglar. Sin deadlines todavía; es una lista de trabajo.
 
+Última revisión: se cotejó commit por commit contra `src/` y `frontends/delys`.
+
 ---
 
 ## Urgente por bug
 
-### El login devuelve 400 en vez de 401
+### ~~Los pedidos no se pueden enviar: `POST /delys/pedido` respondía 401~~ RESUELTO
 
-**Dónde.** `POST /auth/login`, en la ruta de fallo de `src/auth/auth.service.ts`.
+**Dónde.** `src/delys/delys.controller.ts` → `agregarPedido()`.
 
-**Qué pasa.** Un login con credenciales incorrectas responde `400 Bad Request`. Lo correcto es `401 Unauthorized`, y es lo que dice el resto del código: el guard y el resto de rutas protegidas asumen 401.
+**Qué pasaba.** La ruta tenía `@Roles('delys')` y el sitio de Delys manda el pedido sin token (el cliente de la pastelería no tiene cuenta). El `JwtAuthGuard` respondía `401 "Falta el token"`, así que el flujo de compra estaba roto de punta a punta. El catálogo y las imágenes nunca estuvieron afectados: se confundía porque el error salía justo después de cargar los datos con las URLs.
 
-Comprobado en Wasmer (simulación local con `npm install --omit=dev`) y también en dev:
+**Arreglo.** `@Public()` en vez de `@Roles('delys')`. Ver y borrar pedidos (`GET`/`DELETE /delys/pedidos`) siguen exigiendo rol `delys`: esas son las del panel.
 
-```bash
-curl -X POST http://127.0.0.1:3000/auth/login \
-  -H 'content-type: application/json' \
-  -d '{"email":"nadie@ejemplo.com","password":"incorrecta123"}'
-# -> HTTP 400   (debería ser 401)
-```
+**Comprobado** contra la base de datos real, sin token: `201 Created`, pedido guardado, `precio_total` 7500 (2 × 1000 + 1 × 5500). Y los 401 de las rutas de panel siguen en pie. `API.md` y `README.md` actualizados.
 
-**Por qué importa.** Cualquier cliente que diferencie "credenciales malas" de petición malformada recibe la señal equivocada. Un 400 normalmente significa que hay que corregir el body; un 401 significa que hay que corregir las credenciales. También rompe los flujos que cuentan reintentos de login, porque un 4xx se puede interpretar como error del cliente y no como fallo de autenticación.
+**Lo que queda de este punto.** La ruta quedó abierta a cualquiera, sin límite. Falta `@nestjs/throttler` (ver Seguridad) antes de considerarla cerrada de verdad.
 
-**Cómo arreglarlo.** Revisar qué excepción lanza `AuthService` cuando no encuentra al usuario o cuando el password no cuadra, y cambiar `BadRequestException` por `UnauthorizedException`. Ojo: hay que tocar solo la rama de credenciales incorrectas. Si el body no cumple el DTO (falta el campo, email mal formado), ese 400 sí es correcto y debe seguir siendo 400, porque es un error de petición y no de credenciales.
-
-**Pendiente de confirmar.** No leí el archivo todavía, así que no sé qué excepción lanza exactamente ni en qué línea. Hay que abrirlo antes de cambiar nada.
+**Nota de deploy.** `dist/` está versionado, así que el cambio solo llega a Wasmer si se commitea el `dist/` recompilado. Ya está recompilado con `npm run build`.
 
 ---
 
-## Deploy
+### `imagen_bytes`: el backend manda un número y el frontend espera una imagen en base64
 
-### El arreglo de Wasmer solo esta en `test_deploy`
+**Dónde.** `frontends/delys/src/app/comunes/imagenes.ts` (`resolverImagenDulce()`) contra el tipo `imagen_bytes` de `frontends/delys/src/app/modelos/dulces.modelo.ts`.
 
-**Dónde.** `save/derikgm-msf-nestjs.yaml`, commit `69cf549`.
+**Qué pasa.** El mismo nombre significa dos cosas distintas:
 
-**Qué pasa.** El arreglo para que Wasmer no intente compilar NestJS vive en la rama `test_deploy`. La rama `develop` todavía tiene `node_framework: nestjs` y no declara `build: ""`, así que un deploy desde `develop` vuelve a fallar con el error de herramientas.
+| Lado | Tipo | Significado |
+| --- | --- | --- |
+| Backend (`src/delys/entities/dulce.entity.ts`) | `number` | Tamaño del archivo, para liberar cuota al borrar |
+| Frontend (`dulces.modelo.ts`) | `string \| null` | La imagen entera en base64 |
 
-**Por qué importa.** Es facil que alguien despliegue desde `develop` por costumbre y se topes otra vez con el mismo error, sin saber de dónde viene.
+`resolverImagenDulce()` hace `dulce.imagen_bytes?.trim()`. Con un número ahí, `?.` no salva: solo protege `null`/`undefined`, y `(12345).trim` no existe, así que reventaría con `TypeError`.
 
-**Opciones.**
+**Estado real: hoy no salta.** En producción los tres dulces tienen `imagen_bytes: null` (las imágenes se subaaron a Storage sin registrar el tamaño), así que la rama ni se ejecuta y no se ve el crash. Queda como bomba de tiempo: en cuanto un dulce tenga `imagen_bytes` con valor, la página de productos deja de renderizar.
 
-1. Llevar el arreglo a `develop` y desplegar desde ahi. Es lo más simple, pero `develop` tiene 4 commits que no están en `test_deploy` (`prueba preliminar`, `Quitando el build` y los 2 del arreglo), así que hay que decidir qué se queda y qué no.
-2. Dejar el arreglo solo en `test_deploy` y dejar claro que el deploy sale de ahi. Funciona, pero es una fuente de confusión.
+**Cómo arreglarlo.** Lo correcto es no enviar el campo: es interno del backend (existe para la cuota) y la interfaz `Dulce` de `delys.interfaces.ts` ya lo omite a propósito. Sacar `imagen_bytes` de la respuesta de `GET /delys/dulces` y dejar el modelo del frontend en `imagen_url` + assets locales. Si se quiere conservar el base64 como respaldo, hay que decidir antes quién lo escribe, porque hoy nadie.
 
-**Relacionado.** El commit `146fd44 Quitando el build` borro el script `build` de `package.json`. El merge lo restauró. Si alguien hace merge de `test_deploy` hacia `develop` de nuevo, el mismo conflicto reaparece en `package.json`.
+**De paso.** Las imágenes de producción devuelven `content-type: application/octet-stream` en vez de `image/jpeg`. Los navegadores las dibujan igual (sniffing), pero conviene subir el bucket con la metadata de tipo correcta.
 
 ---
 
-## Ideas de codigo
+## Decisiones tomadas (no son bugs, pero conviene no olvidarlas)
 
 ### `dist/` esta versionado
 
@@ -56,9 +53,23 @@ curl -X POST http://127.0.0.1:3000/auth/login \
 
 **Si se quiere limpiar.** Sacar `dist/` de git obliga a cambiar el modelo de deploy: Wasmer tendria que poder compilar, lo cual necesita `typescript` en `dependencies` en vez de `devDependencies`, o un paso de build en otro lado. Es un cambio de fondo, no una limpieza cosmetica. Anotado para decidir con calma, no para hacerlo ya.
 
+### El arreglo de Wasmer ya esta en `develop`
+
+Estaba en `test_deploy` y generaba Confusion ("si desplego desde `develop` falla"). **Resuelto**: el commit `1c50570` ya esta en `develop`, y el diff entre las dos ramas es de un unico archivo:
+
+```
+dist/delys/delys.service.js.map   (borrado en test_deploy)
+```
+
+Los dos ultimos commits de cada rama son los mismos con otro hash (`69cf549`/`1c50570` y `60b719f`/`0a13f9d`). Se puede desplegar desde `develop` con normalidad. Cuando toque, `test_deploy` se puede borrar.
+
+---
+
+## Ideas de codigo
+
 ### El `.gitignore` ignora `tsbuildinfo` pero el archivo se llama `tsconfig.build.tsbuildinfo`
 
-**Qué pasa.** La regla es `tsbuildinfo` sin barra ni asterisco, así que solo ignora un archivo llamado exactamente `tsbuildinfo`. `tsconfig.build.tsbuildinfo` no coincide y por eso se cuela en el repo como archivo no trackeado.
+**Qué pasa.** La regla es `tsbuildinfo` sin barra ni asterisco, así que solo ignora un archivo llamado exactamente `tsbuildinfo`. Hay un `dist/tsbuildinfo` hoy, pero en cuanto `tsc` lo renombre a `tsconfig.build.tsbuildinfo` se cuela en el repo como archivo no trackeado.
 
 **Arreglo trivial.** Cambiar la regla por `*.tsbuildinfo`.
 
@@ -84,8 +95,9 @@ Las columnas de entrega (`direccion`, `telefono`, `fecha`) son `nullable` solo p
 
 ### Seguridad
 
-- Falta la `SUPABASE_SERVICE_ROLE_KEY` real en `.env`. **Nota:** ya no es un marcador; ahora hay una clave `sb_secret_...` que funciona y sube imagenes a Storage correctamente. La nota de `Decisiones.md` que dice que falta esta pendiente de actualizarse.
-- No hay limite de intentos de login (`@nestjs/throttler`) ni log de auditoria. Relevante ahora que se sabe que el login responde 400 en vez de 401.
+- La `SUPABASE_SERVICE_ROLE_KEY` de `.env` **ya es real** (empieza con `sb_secret_`) y sube imagenes a Storage correctamente. La nota de `Decisiones.md` que dice que falta esta pendiente de actualizarse.
+- No hay limite de intentos de login (`@nestjs/throttler`) ni log de auditoria.
+- `POST /delys/pedido` quedó **pública** al arreglar el 401 del frontend. Ahora cualquiera puede mandar pedidos, sin límite. Es lo que corresponde al flujo real (el cliente no tiene cuenta), pero necesita throttler antes de darse por buena: un tope por IP y/o por `telefono`. La instalación de `@nestjs/throttler` hay que hacerla a mano, no está en `package.json`.
 
 ---
 
@@ -102,8 +114,15 @@ Las columnas de entrega (`direccion`, `telefono`, `fecha`) son `nullable` solo p
 53eb54c limpieza de imagenes
 ```
 
-**Vías para subirlos.** Pushear desde la máquina local; crear un Codespace desde el repo de Delys; o agregar una SSH key / PAT con permisos de escritura.
+**Vías para subirlos.** Pushear desde la máquina local; crear un Codespace desde el repo de Delys; o agregar un SSH key / PAT con permisos de escritura.
 
 ### Recordatorio de deploy del frontend
 
 `npm run deploy` en `frontends/delys` publica en `derikgm.github.io/Delys`. **No correrlo hasta que el usuario lo pida**: estamos probando y el sitio está en uso. Los assets de `develop_complex` referencian `derikgm.github.io` y la carpeta `Delys` en `src/app/comunes/imagenes.ts`, así que cambiar esos valores afecta a producción.
+
+La rama `gh-pages` está al día con `develop_complex` (no tiene commits que esta no tenga), o sea que lo publicado corresponde a los 2 commits sin subir.
+
+### `api.ts` apunta a producción siempre (a propósito)
+
+`frontends/delys/src/app/datos/api.ts` está **sin commitear** en `develop_complex` con las dos ramas de la ternaria en `API_PRODUCCION`, para probar contra el backend de Wasmer en vez del local. **No es un bug: es intencional.** Lo único a tener en cuenta es que no se debe commitear por descuido, porque `API_DESARROLLO` (`http://localhost:3000/delys`) quedaría sin usarse para siempre.
+

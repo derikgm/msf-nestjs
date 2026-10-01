@@ -19,7 +19,7 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `POST` | `/auth/cambiar-password` | cualquier rol, solo la propia contraseña |
 | `GET` | `/auth/yo` | cualquier rol |
 | `GET` | `/storage/quota` | cualquier rol, devuelve la cuota de su proyecto |
-| `POST` | `/delys/pedido` | `delys` o `admin` |
+| `POST` | `/delys/pedido` | **público** |
 | `GET` | `/delys/pedidos` | `delys` o `admin` |
 | `GET` | `/delys/pedidos/:id` | `delys` o `admin` |
 | `DELETE` | `/delys/pedidos/:id` | `delys` o `admin` |
@@ -27,6 +27,8 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `DELETE` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
 
 `admin` es el único rol con paso libre: `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin importar el rol que pida. El resto de roles solo ven lo de su propio proyecto (ver [Decisiones.md](Decisiones.md), punto 1.3).
+
+Las rutas públicas son las que puede usar alguien sin cuenta: mirar el catálogo y **enviar un pedido**. El cliente de la pastelería no tiene credenciales, así que el alta de pedidos no lleva token. El resto de rutas de pedidos (`GET`/`DELETE`) sí lo exigen, porque son las del panel.
 
 Formato de errores, siempre el mismo:
 
@@ -238,7 +240,7 @@ curl localhost:3000/delys/ofertas
 
 ### 11. `POST /delys/pedido`
 
-Crea un pedido. Requiere token con rol `delys`.
+Crea un pedido. **Ruta pública: no hace falta token.** El cliente de la pastelería no tiene cuenta, así que el pedido entra sin credenciales. Ver y borrar pedidos sí exige rol `delys` (secciones 12 a 14).
 
 **El `dulce` es solo el id.** El nombre y el precio los pone el servidor leyéndolos del catálogo: mandarlos en el body no sirve de nada (ver [Decisiones.md](Decisiones.md), punto 1.1).
 
@@ -256,7 +258,6 @@ Crea un pedido. Requiere token con rol `delys`.
 
 ```bash
 curl -X POST localhost:3000/delys/pedido \
-  -H "Authorization: Bearer eyJ..." \
   -H 'content-type: application/json' \
   -d '{
         "direccion": "Calle Reforma 222, Centro",
@@ -307,7 +308,10 @@ curl -X POST localhost:3000/delys/pedido \
 | sin `direccion` / `telefono` / `fecha` | `400` |
 | `telefono: "123"` (menos de 7) | `400` "El teléfono debe tener al menos 7 caracteres" |
 | sin `notas` | correcto, se guarda `null` |
-| Sin token | `401` |
+
+Una diferencia con el resto de la API: aquí no hay `401` ni `403` por falta de token, porque no se comprueba. Lo único que puede salir mal es el `400` de validación y el `404` de un dulce inexistente.
+
+**Pendiente:** esta ruta acepta peticiones de cualquiera, sin límite. Cuando se conecte `@nestjs/throttler` hay que decidir el tope (por IP y/o por `telefono`) antes de abrirla al público de verdad.
 
 ---
 
