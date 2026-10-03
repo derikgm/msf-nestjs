@@ -19,6 +19,9 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `POST` | `/auth/cambiar-password` | cualquier rol, solo la propia contraseña |
 | `GET` | `/auth/yo` | cualquier rol |
 | `GET` | `/storage/quota` | cualquier rol, devuelve la cuota de su proyecto |
+| `POST` | `/delys/dulces` | `delys` o `admin`, **alta en el catálogo** |
+| `PATCH` | `/delys/dulces/:id` | `delys` o `admin`, **edita nombre o precio** |
+| `DELETE` | `/delys/dulces/:id` | `delys` o `admin`, **borra del catálogo** |
 | `POST` | `/delys/pedido` | **público** |
 | `GET` | `/delys/pedidos` | `delys` o `admin` |
 | `GET` | `/delys/pedidos/:id` | `delys` o `admin` |
@@ -441,6 +444,103 @@ curl -X DELETE localhost:3000/delys/dulces/1/imagen -H "Authorization: Bearer ey
 ```
 
 El dulce sigue en el catálogo; solo pierde la foto. Es la forma de devolver los bytes a la cuota.
+
+---
+
+### 17. `POST /delys/dulces`
+
+Alta de un dulce en el catálogo, desde el panel de la pastelería. Requiere token `delys`.
+
+**El `id` no se manda: lo asigna el servidor** (el siguiente libre, `MAX(id) + 1`). La tabla `dulce` usa el id como clave primaria sin autogenerar y la sembró `data/ofertas.ts` con ids a mano, así que aceptarlo del cliente dejaría pisar dulces existentes.
+
+| Parámetro | Tipo | Reglas |
+| --- | --- | --- |
+| `nombre` | string | obligatorio, no vacío, máx. 120 |
+| `precio` | number | obligatorio, 0 o mayor, hasta 2 decimales |
+
+```bash
+curl -X POST localhost:3000/delys/dulces \
+  -H "Authorization: Bearer eyJ..." \
+  -H 'content-type: application/json' \
+  -d '{"nombre":"Concha de chocolate","precio":1800}'
+```
+
+```json
+{
+  "mensaje": "Dulce creado correctamente",
+  "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 1800, "imagen_url": null, "imagen_bytes": null }
+}
+```
+
+El dulce nace sin imagen: se sube aparte con la sección 15.
+
+| Situación | Respuesta |
+| --- | --- |
+| Sin token | `401` |
+| Token de otro proyecto | `403` |
+| `"nombre": ""` | `400` |
+| `"precio": -5` | `400` |
+| `"precio": "mucho"` | `400` |
+| mandar `"id": 1` | se ignora: el id lo pone el servidor (`whitelist: true`) |
+| mandar `"imagen_url": "..."` | se ignora |
+
+El alta va en transacción. Dos altas simultáneas calcularían el mismo id y la restricción de clave primaria hace que una gane y la otra reciba un error de duplicado.
+
+---
+
+### 18. `PATCH /delys/dulces/:id`
+
+Edita un dulce. Requiere token `delys`. Se manda **solo lo que cambia**.
+
+| Parámetro | Dónde | Tipo | Reglas |
+| --- | --- | --- | --- |
+| `id` | path | number | entero |
+| `nombre` | body | string | opcional, no vacío, máx. 120 |
+| `precio` | body | number | opcional, 0 o mayor, hasta 2 decimales |
+
+```bash
+curl -X PATCH localhost:3000/delys/dulces/12 \
+  -H "Authorization: Bearer eyJ..." \
+  -H 'content-type: application/json' \
+  -d '{"precio":2100}'
+```
+
+```json
+{ "mensaje": "Dulce actualizado correctamente", "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 2100, "imagen_url": null, "imagen_bytes": null } }
+```
+
+| Situación | Respuesta |
+| --- | --- |
+| Cuerpo `{}` o sin los dos campos | `400` "No hay nada que actualizar: manda \"nombre\" o \"precio\"" |
+| `id` inexistente | `404` "No existe el dulce 99" |
+| mandar los dos campos | correcto: cambian los dos |
+| mandar `"imagen_url"` | se ignora: la imagen va por su propia ruta |
+
+---
+
+### 19. `DELETE /delys/dulces/:id`
+
+Borra el dulce del catálogo. Requiere token `delys`. Mismo parámetro `id` entero.
+
+```bash
+curl -X DELETE localhost:3000/delys/dulces/12 -H "Authorization: Bearer eyJ..."
+# -> { "ok": true }
+```
+
+**Antes de borrar la fila libera su imagen**: si el dulce tenía foto, el archivo sale de Supabase Storage y sus bytes vuelven a la cuota del rol. Así no quedan archivos huérfanos ocupando espacio (ver TODO.md, "Cuota de Storage").
+
+**Un dulce que está en un pedido sin resolver no se puede borrar.** El renglón de un encargo forma parte del pedido y `pedido.precio_total` está guardado, no se recalcula: borrarlo dejaría al pedido con un total que no cuadra con sus renglones y sin forma de saber qué se había pedido. Por eso `encargo.dulce_id` es `ON DELETE RESTRICT` y el servicio cuenta los pedidos abiertos antes de borrar.
+
+| Situación | Respuesta |
+| --- | --- |
+| `id` inexistente | `404` |
+| dulce en 1 pedido sin resolver | `409`: `"Charolas surtida" está en 1 pedido sin resolver. Márcalo como hecho o cancélalo en Pedidos, y ya lo podrás borrar.` |
+| dulce en varios pedidos sin resolver | `409`, con el número de pedidos: `"..." está en 3 pedidos sin resolver. ...` |
+| dulce sin imagen | correcto: no hay nada que liberar |
+| Storage sin credenciales o caído | el dulce **se borra igual** y se registra un `warn`; el archivo huérfano queda pendiente de limpiar a mano |
+| no se pudo contar los pedidos | `503`: no se borra. Ante la duda se bloquea: perder un pedido es peor que dejar un dulce en el catálogo |
+
+Un dulce se puede borrar siempre que sus pedidos estén resueltos: al resolver un pedido (hecho o cancelado) sus encargos se van en cascada con él y el dulce queda libre.
 
 ---
 

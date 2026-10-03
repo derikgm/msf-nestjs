@@ -1,13 +1,18 @@
 import { OnApplicationBootstrap } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { CreatePedidoDto } from './dto/create-pedido.dto.js';
+import { CreateDulceDto } from './dto/create-dulce.dto.js';
+import { UpdateDulceDto } from './dto/update-dulce.dto.js';
 import { Dulce, Encargo, Pedido } from './entities/index.js';
+import { DulceImagenService } from './dulce-imagen.service.js';
+import type { AuthUser } from '../auth/auth.interfaces.js';
 export declare class DelysService implements OnApplicationBootstrap {
     private readonly pedidoRepo;
     private readonly encargoRepo;
     private readonly dulceRepo;
+    private readonly imagenes;
     private readonly logger;
-    constructor(pedidoRepo: Repository<Pedido>, encargoRepo: Repository<Encargo>, dulceRepo: Repository<Dulce>);
+    constructor(pedidoRepo: Repository<Pedido>, encargoRepo: Repository<Encargo>, dulceRepo: Repository<Dulce>, imagenes: DulceImagenService);
     onApplicationBootstrap(): Promise<void>;
     crearPedido(createPedidoDto: CreatePedidoDto): Promise<{
         ok: boolean;
@@ -16,6 +21,19 @@ export declare class DelysService implements OnApplicationBootstrap {
     obtenerTodosDulces(): Promise<{
         dulces: Dulce[];
     }>;
+    crearDulce(createDulceDto: CreateDulceDto): Promise<{
+        mensaje: string;
+        dulce: Dulce;
+    }>;
+    actualizarDulce(id: number, updateDulceDto: UpdateDulceDto): Promise<{
+        mensaje: string;
+        dulce: Dulce;
+    }>;
+    eliminarDulce(id: number, caller: AuthUser): Promise<{
+        ok: boolean;
+    }>;
+    private pedidosQuePiden;
+    private mensajeDePedidosQueBloquean;
     obtenerTodosPedidos(): Promise<{
         pedidos: Pedido[];
     }>;

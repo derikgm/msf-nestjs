@@ -8,6 +8,7 @@ export declare class DulceImagenService {
     private readonly dulceRepo;
     private readonly supabase;
     private readonly cuota;
+    private readonly logger;
     constructor(dulceRepo: Repository<Dulce>, supabase: SupabaseService, cuota: StorageQuotaService);
     subir(dulceId: number, file: MulterFile, caller: AuthUser): Promise<{
         mensaje: string;
@@ -19,7 +20,8 @@ export declare class DulceImagenService {
         dulce: Dulce;
         cuota: import("../common/services/storage-quota.service.js").ResumenCuota;
     }>;
-    private liberarImagenAnterior;
+    liberarParaBorrar(dulce: Dulce, caller: AuthUser): Promise<void>;
+    private liberarDe;
     private obtenerDulce;
     private bucketDe;
     private extensionDe;

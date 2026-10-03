@@ -1,0 +1,29 @@
+import { Type } from 'class-transformer';
+import { IsNotEmpty, IsNumber, IsString, MaxLength, Min } from 'class-validator';
+
+/**
+ * Alta de un dulce del catálogo, desde el panel de la pastelería.
+ *
+ * El `id` no se recibe: lo asigna el servidor. La tabla `dulce` usa el id como
+ * clave primaria y el catálogo de `data/ofertas.ts` lo define a mano, así que si
+ * el cliente lo mandara podría pisar un dulce existente o inventarse uno con el
+ * id que quisiera.
+ *
+ * Los mensajes van en español a propósito: el panel los enseña tal cual, y
+ * `class-validator` por defecto responde en inglés.
+ */
+export class CreateDulceDto {
+  @IsString({ message: 'El nombre tiene que ser texto' })
+  @IsNotEmpty({ message: 'El nombre no puede estar vacío' })
+  @MaxLength(120, { message: 'El nombre no puede pasar de 120 letras' })
+  nombre: string;
+
+  /** Admite decimales: el catálogo los guarda en `numeric(12,2)`. */
+  @Type(() => Number)
+  @IsNumber(
+    { maxDecimalPlaces: 2 },
+    { message: 'El precio tiene que ser un número con hasta dos decimales' },
+  )
+  @Min(0, { message: 'El precio no puede ser negativo' })
+  precio: number;
+}

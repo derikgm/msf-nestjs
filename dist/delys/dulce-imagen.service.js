@@ -10,7 +10,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+var DulceImagenService_1;
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
@@ -22,10 +23,11 @@ const BUCKET_POR_ROL = {
     delys: 'delys',
     domus: 'domus',
 };
-let DulceImagenService = class DulceImagenService {
+let DulceImagenService = DulceImagenService_1 = class DulceImagenService {
     dulceRepo;
     supabase;
     cuota;
+    logger = new Logger(DulceImagenService_1.name);
     constructor(dulceRepo, supabase, cuota) {
         this.dulceRepo = dulceRepo;
         this.supabase = supabase;
@@ -50,7 +52,7 @@ let DulceImagenService = class DulceImagenService {
             await this.cuota.decrementarUso(caller.rol, bytes);
             throw error;
         }
-        await this.liberarImagenAnterior(bucket, dulce, caller.rol);
+        await this.liberarDe(dulce, caller.rol);
         dulce.imagen_url = this.supabase.getPublicUrl(bucket, path);
         dulce.imagen_bytes = bytes;
         const actualizado = await this.dulceRepo.save(dulce);
@@ -81,9 +83,19 @@ let DulceImagenService = class DulceImagenService {
             cuota: await this.cuota.getResumen(caller.rol),
         };
     }
-    async liberarImagenAnterior(bucket, dulce, rol) {
+    async liberarParaBorrar(dulce, caller) {
+        try {
+            await this.liberarDe(dulce, caller.rol);
+        }
+        catch (error) {
+            this.logger.warn(`No se pudo liberar la imagen del dulce ${dulce.id}: ${error.message}. ` +
+                'El dulce se borra igual y el archivo queda pendiente de limpiar a mano.');
+        }
+    }
+    async liberarDe(dulce, rol) {
         if (!dulce.imagen_url)
             return;
+        const bucket = this.bucketDe(rol);
         const path = this.supabase.pathDesdeUrl(bucket, dulce.imagen_url);
         if (path)
             await this.supabase.eliminar(bucket, [path]);
@@ -105,7 +117,7 @@ let DulceImagenService = class DulceImagenService {
         return /^\.[a-z0-9]{1,5}$/.test(extension) ? extension : '.bin';
     }
 };
-DulceImagenService = __decorate([
+DulceImagenService = DulceImagenService_1 = __decorate([
     Injectable(),
     __param(0, Inject(getRepositoryToken(Dulce))),
     __metadata("design:paramtypes", [Repository,

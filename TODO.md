@@ -2,7 +2,7 @@
 
 Pendientes y cosas que hay que arreglar. Sin deadlines todavía; es una lista de trabajo.
 
-Última revisión: se cotejó commit por commit contra `src/` y `frontends/delys`.
+Última revisión: se agregaron las tres rutas de gestión del catálogo (`POST`/`PATCH`/`DELETE /delys/dulces`). El resto está como estaba, cotejado commit por commit contra `src/` y `frontends/delys`.
 
 ---
 
@@ -67,11 +67,11 @@ Los dos ultimos commits de cada rama son los mismos con otro hash (`69cf549`/`1c
 
 ## Ideas de codigo
 
-### El `.gitignore` ignora `tsbuildinfo` pero el archivo se llama `tsconfig.build.tsbuildinfo`
+### ~~El `.gitignore` ignora `tsbuildinfo` pero el archivo se llama `tsconfig.build.tsbuildinfo`~~ RESUELTO
 
-**Qué pasa.** La regla es `tsbuildinfo` sin barra ni asterisco, así que solo ignora un archivo llamado exactamente `tsbuildinfo`. Hay un `dist/tsbuildinfo` hoy, pero en cuanto `tsc` lo renombre a `tsconfig.build.tsbuildinfo` se cuela en el repo como archivo no trackeado.
+**Arreglo.** La regla ahora es `*.tsbuildinfo`, así que cubre los dos nombres (`dist/tsbuildinfo` de `tsconfig.build.json` y `dist/tsconfig.tsbuildinfo` del tsconfig raíz, que es el que usa el editor y pesa 272 KB).
 
-**Arreglo trivial.** Cambiar la regla por `*.tsbuildinfo`.
+**Nota.** `dist/tsconfig.tsbuildinfo` sí estaba appearing como untracked en `git status`; con la regla nueva ya no aparece. No hizo falta `git rm --cached` porque nunca llegó a estar trackeado.
 
 ---
 
@@ -79,9 +79,15 @@ Los dos ultimos commits de cada rama son los mismos con otro hash (`69cf549`/`1c
 
 ### Cuota de Storage y archivos huerfanos
 
-**Qué queda.** Cuando se borró el dulce `Panetela Grande` de la base, su imagen nunca llegó a subirse a Storage (no tenía `imagen_url`), así que no quedaron archivos huérfanos ahí. Pero el patrón sigue siendo un riesgo: si se borra un dulce que sí tenga imagen, el archivo en Supabase Storage se queda ahí ocupando cuota sin que nada lo apunte.
+**Qué queda.** Cuando se borró el dulce `Panetela Grande` de la base, su imagen nunca llegó a subirse a Storage (no tenía `imagen_url`), así que no quedaron archivos huérfanos ahí. Ese caso ya no puede volver a pasar por la vía normal: `DELETE /delys/dulces/:id` (ver "Gestión del catálogo desde el panel") libera la imagen antes de borrar la fila, con `DulceImagenService.liberarParaBorrar()`. Lo que **sí** queda es que esa liberación se traga el error si Storage falla: el dulce desaparece del catálogo y el archivo se queda ahí ocupando cuota, sin nada que lo apunte. Queda logged como `warn` y hay que limpiarlo a mano.
 
 `StorageQuotaService.decrementarUso()` sigue haciendo leer-y-escribir: dos borrados de imagen a la vez pueden pisarse y la cuota queda desviada. `reservarCuota()` sí está protegido con un `UPDATE` condicional. Cuando se toque eso, `decrementarUso()` debería hacer `SET bytes_usados = GREATEST(bytes_usados - n, 0)` en una sola sentencia.
+
+### La gestion del catalogo se hacia por SQL
+
+**Resuelto.** El catálogo solo se podía leer; crearlo, renombrarlo, reprecificarlo o borrarlo era SQL directo (`Decisiones.md`, punto 1.1). Ahora hay tres rutas de panel detrás de `@Roles('delys')`: `POST /delys/dulces`, `PATCH /delys/dulces/:id` y `DELETE /delys/dulces/:id`. El id lo asigna el servidor, así que el cliente no puede pisar un dulce existente ni inventarse ids.
+
+**Lo que sigue igual a propósito.** `POST /delys/pedido` sigue sin tocar el catálogo: sigue recibiendo solo el id del dulce y el total lo calcula el servidor con los precios de la tabla. Que el panel pueda escribir el catálogo no significa que lo pueda hacer un pedido de cualquiera.
 
 ### Migraciones pendientes
 

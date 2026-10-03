@@ -7,6 +7,7 @@ import {
   Param,
   ParseIntPipe,
   ParseUUIDPipe,
+  Patch,
   Post,
   Req,
   UploadedFile,
@@ -16,6 +17,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { DelysService } from './delys.service.js';
 import { DulceImagenService, type MulterFile } from './dulce-imagen.service.js';
 import { CreatePedidoDto } from './dto/create-pedido.dto.js';
+import { CreateDulceDto } from './dto/create-dulce.dto.js';
+import { UpdateDulceDto } from './dto/update-dulce.dto.js';
 import type { AuthUser, RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -43,6 +46,34 @@ export class DelysController {
   @Get('ofertas')
   obtenerOfertas() {
     return this.delysService.obtenerOfertas();
+  }
+
+  // Gestión del catálogo desde el panel de la pastelería. Estas tres rutas son
+  // la contrapartida de que `POST /delys/pedido` ya no escriba el catálogo: el
+  // pedido no lo toca, pero quien administra la vitrina sí puede.
+  // El id del dulce lo asigna el servidor; ver `DelysService.crearDulce()`.
+  @Roles('delys')
+  @Post('dulces')
+  crearDulce(@Body() createDulceDto: CreateDulceDto) {
+    return this.delysService.crearDulce(createDulceDto);
+  }
+
+  @Roles('delys')
+  @Patch('dulces/:id')
+  actualizarDulce(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Body() updateDulceDto: UpdateDulceDto,
+  ) {
+    return this.delysService.actualizarDulce(id, updateDulceDto);
+  }
+
+  @Roles('delys')
+  @Delete('dulces/:id')
+  eliminarDulce(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Req() request: RequestConUsuario,
+  ) {
+    return this.delysService.eliminarDulce(id, this.usuarioActual(request));
   }
 
   // Imágenes: multipart/form-data con el archivo en el campo "imagen".

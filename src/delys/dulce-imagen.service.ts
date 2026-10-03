@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
@@ -18,6 +18,8 @@ const BUCKET_POR_ROL: Record<string, string> = {
 
 @Injectable()
 export class DulceImagenService {
+  private readonly logger = new Logger(DulceImagenService.name);
+
   constructor(
     @Inject(getRepositoryToken(Dulce))
     private readonly dulceRepo: Repository<Dulce>,
@@ -59,7 +61,7 @@ export class DulceImagenService {
     }
 
     // Si el dulce ya tenía imagen, la anterior libera su cuota.
-    await this.liberarImagenAnterior(bucket, dulce, caller.rol);
+    await this.liberarDe(dulce, caller.rol);
 
     dulce.imagen_url = this.supabase.getPublicUrl(bucket, path);
     dulce.imagen_bytes = bytes;
@@ -101,13 +103,34 @@ export class DulceImagenService {
     };
   }
 
-  private async liberarImagenAnterior(
-    bucket: string,
-    dulce: Dulce,
-    rol: string,
-  ) {
+  /**
+   * Libera la imagen de un dulce que se va a borrar: quita el archivo de Storage
+   * y devuelve los bytes a la cuota del rol.
+   *
+   * A diferencia de `eliminar()`, no falla si el dulce no tiene imagen, porque
+   * borrar un dulce sin foto es lo normal. Está pensado para que quien borre la
+   * fila no tenga que saber nada de Storage ni de la cuota.
+   *
+   * Si Storage no está configurado o no responde, el fallo se registra pero no
+   * detiene el borrado: el dulce sí tiene que desaparecer del catálogo, y el
+   * archivo huérfano se limpia a mano (ver TODO.md, "Cuota de Storage").
+   */
+  async liberarParaBorrar(dulce: Dulce, caller: AuthUser) {
+    try {
+      await this.liberarDe(dulce, caller.rol);
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo liberar la imagen del dulce ${dulce.id}: ${(error as Error).message}. ` +
+          'El dulce se borra igual y el archivo queda pendiente de limpiar a mano.',
+      );
+    }
+  }
+
+  /** El archivo de un dulce y sus bytes de cuota. Falla si Storage no responde. */
+  private async liberarDe(dulce: Dulce, rol: string) {
     if (!dulce.imagen_url) return;
 
+    const bucket = this.bucketDe(rol);
     const path = this.supabase.pathDesdeUrl(bucket, dulce.imagen_url);
 
     if (path) await this.supabase.eliminar(bucket, [path]);

@@ -21,7 +21,7 @@ __decorate([
     __metadata("design:type", String)
 ], Encargo.prototype, "id", void 0);
 __decorate([
-    ManyToOne(() => Dulce, { onDelete: 'CASCADE', nullable: false }),
+    ManyToOne(() => Dulce, { onDelete: 'RESTRICT', nullable: false }),
     JoinColumn({ name: 'dulce_id' }),
     __metadata("design:type", Dulce)
 ], Encargo.prototype, "dulce", void 0);
