@@ -1,0 +1,1 @@
+{"version":3,"file":"negocio.config.js","sourceRoot":"","sources":["../../src/delys/negocio.config.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,OAAO,EAAE,MAAM,mBAAmB,CAAC;AAuB5C,MAAM,CAAC,MAAM,OAAO,GAAG,MAAM,CAAC,SAAS,CAAC,CAAC;AAYzC,MAAM,CAAC,MAAM,YAAY,GAAkB;IACzC,KAAK,EAAE,OAAO;IACd,QAAQ,EAAE,OAAO;IACjB,eAAe,EAAE,OAAO;CACzB,CAAC"}

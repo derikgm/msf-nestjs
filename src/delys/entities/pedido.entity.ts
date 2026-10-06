@@ -17,6 +17,14 @@ export class Pedido implements PedidoShape {
   precio_total: number;
 
   /**
+   * De quién es el pedido: `delys` o `adc` (punto 6). El `encargo` **no** lo
+   * lleva: es un renglón de este pedido y su negocio se deduce de aquí, así que
+   * no hay que tocar su FK. `default: 'delys'` para los pedidos existentes.
+   */
+  @Column({ type: 'varchar', length: 16, default: 'delys' })
+  negocio: string;
+
+  /**
    * Los datos de entrega.
  *
    * `direccion`, `telefono` y `fecha` son obligatorios en el modelo, pero las

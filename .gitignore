@@ -19,3 +19,5 @@ tsbuildinfo
 # pero ningún frontend entra al repo.
 frontends/**
 !frontends/README.md
+# Respaldo de la base de datos (contiene hashes de contraseñas): nunca se sube.
+respaldo/

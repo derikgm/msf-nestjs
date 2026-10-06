@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DelysModule } from './delys/delys.module.js';
+import { AdcModule } from './adc/adc.module.js';
 import { ControlModule } from './control/control.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { StorageQuotaModule } from './common/modules/storage-quota/storage-quota.module.js';
@@ -27,6 +28,7 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
       }),
     }),
     DelysModule,
+    AdcModule,
     ControlModule,
     AuthModule,
     StorageQuotaModule,

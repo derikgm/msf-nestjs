@@ -17,6 +17,7 @@ import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { Dulce } from './entities/index.js';
+import { NEGOCIO } from './negocio.config.js';
 import { SupabaseService } from '../common/services/supabase.service.js';
 import { StorageQuotaService } from '../common/services/storage-quota.service.js';
 const BUCKET_POR_ROL = {
@@ -24,11 +25,13 @@ const BUCKET_POR_ROL = {
     domus: 'domus',
 };
 let DulceImagenService = DulceImagenService_1 = class DulceImagenService {
+    config;
     dulceRepo;
     supabase;
     cuota;
     logger = new Logger(DulceImagenService_1.name);
-    constructor(dulceRepo, supabase, cuota) {
+    constructor(config, dulceRepo, supabase, cuota) {
+        this.config = config;
         this.dulceRepo = dulceRepo;
         this.supabase = supabase;
         this.cuota = cuota;
@@ -65,7 +68,7 @@ let DulceImagenService = DulceImagenService_1 = class DulceImagenService {
     async eliminar(dulceId, caller) {
         const dulce = await this.obtenerDulce(dulceId);
         if (!dulce.imagen_url) {
-            throw new BadRequestException(`El dulce ${dulceId} no tiene imagen`);
+            throw new BadRequestException(`El ${this.config.articulo} ${dulceId} no tiene imagen`);
         }
         const bytes = dulce.imagen_bytes ?? 0;
         const bucket = this.bucketDe(caller.rol);
@@ -103,9 +106,9 @@ let DulceImagenService = DulceImagenService_1 = class DulceImagenService {
             await this.cuota.decrementarUso(rol, dulce.imagen_bytes);
     }
     async obtenerDulce(id) {
-        const dulce = await this.dulceRepo.findOneBy({ id });
+        const dulce = await this.dulceRepo.findOneBy({ id, negocio: this.config.clave });
         if (!dulce) {
-            throw new BadRequestException(`No existe el dulce ${id}`);
+            throw new BadRequestException(`No existe el ${this.config.articulo} ${id}`);
         }
         return dulce;
     }
@@ -119,8 +122,9 @@ let DulceImagenService = DulceImagenService_1 = class DulceImagenService {
 };
 DulceImagenService = DulceImagenService_1 = __decorate([
     Injectable(),
-    __param(0, Inject(getRepositoryToken(Dulce))),
-    __metadata("design:paramtypes", [Repository,
+    __param(0, Inject(NEGOCIO)),
+    __param(1, Inject(getRepositoryToken(Dulce))),
+    __metadata("design:paramtypes", [Object, Repository,
         SupabaseService,
         StorageQuotaService])
 ], DulceImagenService);

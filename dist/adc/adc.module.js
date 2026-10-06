@@ -6,21 +6,22 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DelysService } from './delys.service.js';
-import { DulceImagenService } from './dulce-imagen.service.js';
-import { DelysController } from './delys.controller.js';
-import { entities } from './entities/index.js';
-import { CONFIG_DELYS, NEGOCIO } from './negocio.config.js';
+import { NEGOCIO } from '../delys/negocio.config.js';
+import { DelysService } from '../delys/delys.service.js';
+import { DulceImagenService } from '../delys/dulce-imagen.service.js';
+import { entities } from '../delys/entities/index.js';
 import { StorageQuotaModule } from '../common/modules/storage-quota/storage-quota.module.js';
 import { SupabaseModule } from '../common/modules/supabase/supabase.module.js';
-let DelysModule = class DelysModule {
+import { AdcController } from './adc.controller.js';
+import { CONFIG_ADC } from './adc.config.js';
+let AdcModule = class AdcModule {
 };
-DelysModule = __decorate([
+AdcModule = __decorate([
     Module({
         imports: [TypeOrmModule.forFeature(entities), StorageQuotaModule, SupabaseModule],
-        controllers: [DelysController],
-        providers: [{ provide: NEGOCIO, useValue: CONFIG_DELYS }, DelysService, DulceImagenService],
+        controllers: [AdcController],
+        providers: [{ provide: NEGOCIO, useValue: CONFIG_ADC }, DelysService, DulceImagenService],
     })
-], DelysModule);
-export { DelysModule };
-//# sourceMappingURL=delys.module.js.map
+], AdcModule);
+export { AdcModule };
+//# sourceMappingURL=adc.module.js.map

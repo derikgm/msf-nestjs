@@ -5,4 +5,6 @@ export declare class Dulce implements DulceShape {
     precio: number;
     imagen_url: string | null;
     imagen_bytes: number | null;
+    moneda: string;
+    negocio: string;
 }

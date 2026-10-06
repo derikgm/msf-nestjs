@@ -19,6 +19,8 @@ export interface Pedido {
     notas: string | null,
     encargos: Encargo [],
     precio_total: number,
+    /** De quién es: `delys`, `adc`… (punto 6). */
+    negocio: string,
 }
 
 export interface Dulce {
@@ -27,6 +29,13 @@ export interface Dulce {
     precio: number,
     /** URL pública del archivo en Supabase Storage; null si el dulce no tiene imagen. */
     imagen_url: string | null,
+    /**
+     * Moneda del `precio` (`'CUP'`, `'USD'`…). Texto libre de hasta 8 letras:
+     * no es un enum, para que puedan entrar monedas nuevas sin migraciones.
+     */
+    moneda: string,
+    /** De quién es: `delys`, `adc`… (punto 6). */
+    negocio: string,
 }
 
 export interface Encargo {

@@ -23,7 +23,7 @@ export declare class AuthService {
             id: string;
             nombre: string;
             usuario: string;
-            rol: "delys" | "domus" | "admin";
+            rol: "delys" | "domus" | "adc" | "admin";
         };
     }>;
     crearUsuario(dto: CreateUsuarioDto, caller: AuthUser): Promise<{
@@ -32,7 +32,7 @@ export declare class AuthService {
             id: string;
             nombre: string;
             usuario: string;
-            rol: "delys" | "domus" | "admin";
+            rol: "delys" | "domus" | "adc" | "admin";
         };
     }>;
     changePassword(caller: AuthUser, dto: ChangePasswordDto): Promise<{

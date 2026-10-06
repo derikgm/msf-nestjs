@@ -20,7 +20,7 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/auth/yo` | cualquier rol |
 | `GET` | `/storage/quota` | cualquier rol, devuelve la cuota de su proyecto |
 | `POST` | `/delys/dulces` | `delys` o `admin`, **alta en el catálogo** |
-| `PATCH` | `/delys/dulces/:id` | `delys` o `admin`, **edita nombre o precio** |
+| `PATCH` | `/delys/dulces/:id` | `delys` o `admin`, **edita nombre, precio o moneda** |
 | `DELETE` | `/delys/dulces/:id` | `delys` o `admin`, **borra del catálogo** |
 | `POST` | `/delys/pedido` | **público** |
 | `GET` | `/delys/pedidos` | `delys` o `admin` |
@@ -221,12 +221,14 @@ curl localhost:3000/delys/dulces
 ```json
 {
   "dulces": [
-    { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "imagen_bytes": null }
+    { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "imagen_bytes": null, "moneda": "CUP" }
   ]
 }
 ```
 
 `imagen_url` es `null` hasta que se suba una imagen por `/delys/dulces/:id/imagen`; `imagen_bytes` es el tamaño del archivo y existe para poder devolver los bytes a la cuota al borrar.
+
+`moneda` es la moneda en la que se lee `precio`. Es **texto de hasta 8 letras y no un enum** (`varchar(8)`, por defecto `CUP`): así caben hoy `USD`, `EUR`, `MLC`… y mañana otra sin migrar nada ni tocar el servidor. Las filas que ya existían en la base se crearon todas en `CUP`.
 
 ---
 
@@ -236,7 +238,7 @@ Texto de las ofertas (sin imágenes). Sin token.
 
 ```bash
 curl localhost:3000/delys/ofertas
-# -> { "ofertas": [ { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null } ] }
+# -> { "ofertas": [ { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "moneda": "CUP" } ] }
 ```
 
 ---
@@ -457,18 +459,19 @@ Alta de un dulce en el catálogo, desde el panel de la pastelería. Requiere tok
 | --- | --- | --- |
 | `nombre` | string | obligatorio, no vacío, máx. 120 |
 | `precio` | number | obligatorio, 0 o mayor, hasta 2 decimales |
+| `moneda` | string | opcional, máx. 8 letras; sin ella nace en `CUP` |
 
 ```bash
 curl -X POST localhost:3000/delys/dulces \
   -H "Authorization: Bearer eyJ..." \
   -H 'content-type: application/json' \
-  -d '{"nombre":"Concha de chocolate","precio":1800}'
+  -d '{"nombre":"Concha de chocolate","precio":1800,"moneda":"USD"}'
 ```
 
 ```json
 {
   "mensaje": "Dulce creado correctamente",
-  "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 1800, "imagen_url": null, "imagen_bytes": null }
+  "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 1800, "imagen_url": null, "imagen_bytes": null, "moneda": "USD" }
 }
 ```
 
@@ -481,6 +484,8 @@ El dulce nace sin imagen: se sube aparte con la sección 15.
 | `"nombre": ""` | `400` |
 | `"precio": -5` | `400` |
 | `"precio": "mucho"` | `400` |
+| `"moneda": "SUPERLARGA"` (más de 8 letras) | `400` |
+| sin `"moneda"` | correcto: nace en `CUP` |
 | mandar `"id": 1` | se ignora: el id lo pone el servidor (`whitelist: true`) |
 | mandar `"imagen_url": "..."` | se ignora |
 
@@ -497,23 +502,25 @@ Edita un dulce. Requiere token `delys`. Se manda **solo lo que cambia**.
 | `id` | path | number | entero |
 | `nombre` | body | string | opcional, no vacío, máx. 120 |
 | `precio` | body | number | opcional, 0 o mayor, hasta 2 decimales |
+| `moneda` | body | string | opcional, máx. 8 letras; si no se manda, no se toca |
 
 ```bash
 curl -X PATCH localhost:3000/delys/dulces/12 \
   -H "Authorization: Bearer eyJ..." \
   -H 'content-type: application/json' \
-  -d '{"precio":2100}'
+  -d '{"precio":2100,"moneda":"eur"}'
 ```
 
 ```json
-{ "mensaje": "Dulce actualizado correctamente", "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 2100, "imagen_url": null, "imagen_bytes": null } }
+{ "mensaje": "Dulce actualizado correctamente", "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 2100, "imagen_url": null, "imagen_bytes": null, "moneda": "EUR" } }
 ```
 
 | Situación | Respuesta |
 | --- | --- |
-| Cuerpo `{}` o sin los dos campos | `400` "No hay nada que actualizar: manda \"nombre\" o \"precio\"" |
+| Cuerpo `{}` o sin los tres campos | `400` "No hay nada que actualizar: manda \"nombre\", \"precio\" o \"moneda\"" |
 | `id` inexistente | `404` "No existe el dulce 99" |
-| mandar los dos campos | correcto: cambian los dos |
+| mandar los tres campos | correcto: cambian los tres |
+| mandar `"moneda": " eur "` | correcto: queda `EUR` (se normaliza a mayúsculas) |
 | mandar `"imagen_url"` | se ignora: la imagen va por su propia ruta |
 
 ---

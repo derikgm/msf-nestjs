@@ -12,6 +12,7 @@ import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'clas
 export class UpdateDulceDto {
     nombre;
     precio;
+    moneda;
 }
 __decorate([
     IsOptional(),
@@ -27,4 +28,10 @@ __decorate([
     Min(0, { message: 'El precio no puede ser negativo' }),
     __metadata("design:type", Number)
 ], UpdateDulceDto.prototype, "precio", void 0);
+__decorate([
+    IsOptional(),
+    IsString({ message: 'La moneda tiene que ser texto' }),
+    MaxLength(8, { message: 'La moneda no puede pasar de 8 letras' }),
+    __metadata("design:type", String)
+], UpdateDulceDto.prototype, "moneda", void 0);
 //# sourceMappingURL=update-dulce.dto.js.map

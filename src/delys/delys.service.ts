@@ -15,6 +15,7 @@ import { CreateDulceDto } from './dto/create-dulce.dto.js';
 import { UpdateDulceDto } from './dto/update-dulce.dto.js';
 import { Dulce, Encargo, Pedido } from './entities/index.js';
 import { ofertas } from './data/ofertas.js';
+import { NEGOCIO, type NegocioConfig } from './negocio.config.js';
 import { DulceImagenService } from './dulce-imagen.service.js';
 import type { AuthUser } from '../auth/auth.interfaces.js';
 
@@ -28,6 +29,12 @@ export class DelysService implements OnApplicationBootstrap {
   private readonly logger = new Logger(DelysService.name);
 
   constructor(
+    /**
+     * Qué negocio atiende esta instancia. La misma clase da servicio a Delys y
+     * a ADC: el `config.clave` es el filtro que impide que se pisen (punto 6).
+     */
+    @Inject(NEGOCIO)
+    private readonly config: NegocioConfig,
     @Inject(getRepositoryToken(Pedido))
     private readonly pedidoRepo: Repository<Pedido>,
     @Inject(getRepositoryToken(Encargo))
@@ -37,12 +44,36 @@ export class DelysService implements OnApplicationBootstrap {
     private readonly imagenes: DulceImagenService,
   ) {}
 
-  /** Carga el catálogo inicial de dulces la primera vez que se levanta la app. */
-  async onApplicationBootstrap() {
-    if ((await this.dulceRepo.count()) > 0) return;
+  /**
+   * Cómo se llama lo que se vende, con mayúscula: los mensajes de la API se
+   * escriben con esto para que ADC no reciba respuestas hablando de dulces.
+   */
+  private articuloEnMayuscula(): string {
+    const articulo = this.config.articulo;
 
-    await this.dulceRepo.save(this.dulceRepo.create(ofertas));
-    this.logger.log(`Catálogo inicial cargado: ${ofertas.length} dulces`);
+    return articulo.charAt(0).toUpperCase() + articulo.slice(1);
+  }
+
+  /**
+   * Carga el catálogo inicial del negocio la primera vez que se levanta la app.
+   *
+   * La cuenta y la semilla son **por negocio**: si Delys ya tiene sus productos,
+   * ADC sigue pudiendo arrancar con la tabla vacía; y como `CONFIG_ADC` trae la
+   * semilla vacía, los dulces de la pastelería no se cuelan en el catálogo de
+   * ADC (punto 6).
+   */
+  async onApplicationBootstrap() {
+    const actuales = await this.dulceRepo.count({ where: { negocio: this.config.clave } });
+
+    if (actuales > 0 || this.config.catalogoInicial.length === 0) return;
+
+    const semilla = this.config.catalogoInicial.map((dulce) => ({
+      ...dulce,
+      negocio: this.config.clave,
+    }));
+
+    await this.dulceRepo.save(this.dulceRepo.create(semilla));
+    this.logger.log(`Catálogo inicial cargado: ${semilla.length} ${this.config.articulo}s`);
   }
 
   /**
@@ -61,7 +92,7 @@ export class DelysService implements OnApplicationBootstrap {
       // dulcesDelCatalogo() ya rechaza los ids que no están. Se repite la comprobación
       // para que un cambio futuro en esa función no acave en un pedido con un dulce
       // undefined en vez de con un 404.
-      if (!dulce) throw new NotFoundException(`No existe el dulce ${encargoDto.dulce}`);
+      if (!dulce) throw new NotFoundException(`No existe el ${this.config.articulo} ${encargoDto.dulce}`);
 
       precio_total += dulce.precio * encargoDto.cantidad;
 
@@ -74,6 +105,7 @@ export class DelysService implements OnApplicationBootstrap {
     const pedido = await this.pedidoRepo.save(
       this.pedidoRepo.create({
         precio_total,
+        negocio: this.config.clave,
         direccion: createPedidoDto.direccion.trim(),
         telefono: createPedidoDto.telefono.trim(),
         fecha: createPedidoDto.fecha,
@@ -86,7 +118,10 @@ export class DelysService implements OnApplicationBootstrap {
   }
 
   async obtenerTodosDulces() {
-    const dulces = await this.dulceRepo.find({ order: { id: 'ASC' } });
+    const dulces = await this.dulceRepo.find({
+      where: { negocio: this.config.clave },
+      order: { id: 'ASC' },
+    });
 
     return { dulces };
   }
@@ -113,37 +148,51 @@ export class DelysService implements OnApplicationBootstrap {
         id,
         nombre: createDulceDto.nombre.trim(),
         precio: createDulceDto.precio,
+        moneda: this.normalizarMoneda(createDulceDto.moneda),
+        negocio: this.config.clave,
         imagen_url: null,
         imagen_bytes: null,
       });
 
       const guardado = await manager.save(Dulce, dulce);
 
-      return { mensaje: 'Dulce creado correctamente', dulce: guardado };
+      return { mensaje: `${this.articuloEnMayuscula()} creado correctamente`, dulce: guardado };
     });
   }
 
   /**
-   * Edición parcial. Se manda solo lo que cambia, y mandar los dos campos es
+   * La moneda llega del panel como texto libre ('CUP', 'USD'…): a mayúsculas
+   * para que 'usd' y 'USD' no sean dos monedas distintas, y vacío o ausente →
+   * 'CUP', que es el valor por defecto de la columna (puntos 5 y 7.1).
+   */
+  private normalizarMoneda(moneda?: string): string {
+    return moneda?.trim().toUpperCase() || 'CUP';
+  }
+
+  /**
+   * Edición parcial. Se manda solo lo que cambia, y mandar los tres campos es
    * válido: en ese caso los dos cambian.
    */
   async actualizarDulce(id: number, updateDulceDto: UpdateDulceDto) {
-    const { nombre, precio } = updateDulceDto;
+    const { nombre, precio, moneda } = updateDulceDto;
 
-    if (nombre === undefined && precio === undefined) {
-      throw new BadRequestException('No hay nada que actualizar: manda "nombre" o "precio"');
+    if (nombre === undefined && precio === undefined && moneda === undefined) {
+      throw new BadRequestException(
+        'No hay nada que actualizar: manda "nombre", "precio" o "moneda"',
+      );
     }
 
-    const dulce = await this.dulceRepo.findOneBy({ id });
+    const dulce = await this.dulceRepo.findOneBy({ id, negocio: this.config.clave });
 
-    if (!dulce) throw new NotFoundException(`No existe el dulce ${id}`);
+    if (!dulce) throw new NotFoundException(`No existe el ${this.config.articulo} ${id}`);
 
     if (nombre !== undefined) dulce.nombre = nombre.trim();
     if (precio !== undefined) dulce.precio = precio;
+    if (moneda !== undefined) dulce.moneda = this.normalizarMoneda(moneda);
 
     const guardado = await this.dulceRepo.save(dulce);
 
-    return { mensaje: 'Dulce actualizado correctamente', dulce: guardado };
+    return { mensaje: `${this.articuloEnMayuscula()} actualizado correctamente`, dulce: guardado };
   }
 
   /**
@@ -158,9 +207,9 @@ export class DelysService implements OnApplicationBootstrap {
    * `Encargo.dulce`; aquí se escribe para poder contar y nombrar.
    */
   async eliminarDulce(id: number, caller: AuthUser) {
-    const dulce = await this.dulceRepo.findOneBy({ id });
+    const dulce = await this.dulceRepo.findOneBy({ id, negocio: this.config.clave });
 
-    if (!dulce) throw new NotFoundException(`No existe el dulce ${id}`);
+    if (!dulce) throw new NotFoundException(`No existe el ${this.config.articulo} ${id}`);
 
     const pedidos = await this.pedidosQuePiden(dulce.id);
 
@@ -184,9 +233,10 @@ export class DelysService implements OnApplicationBootstrap {
         .createQueryBuilder('encargo')
         .innerJoin('encargo.pedido', 'pedido')
         .where('encargo.dulce = :dulceId', { dulceId })
+        .andWhere('pedido.negocio = :negocio', { negocio: this.config.clave })
         .getCount();
     } catch (error) {
-      this.logger.error(`No se pudo comprobar si el dulce ${dulceId} está en pedidos: ${error}`);
+      this.logger.error(`No se pudo comprobar si el ${this.config.articulo} ${dulceId} está en pedidos: ${error}`);
 
       throw new ServiceUnavailableException('No se pudo comprobar los pedidos. Inténtalo de nuevo.');
     }
@@ -203,13 +253,13 @@ export class DelysService implements OnApplicationBootstrap {
   }
 
   async obtenerTodosPedidos() {
-    const pedidos = await this.pedidoRepo.find({ relations });
+    const pedidos = await this.pedidoRepo.find({ where: { negocio: this.config.clave }, relations });
 
     return { pedidos };
   }
 
   async obtenerPedido(id: string) {
-    const pedido = await this.pedidoRepo.findOne({ where: { id }, relations });
+    const pedido = await this.pedidoRepo.findOne({ where: { id, negocio: this.config.clave }, relations });
 
     if (!pedido) throw new NotFoundException(`No existe el pedido ${id}`);
 
@@ -217,7 +267,7 @@ export class DelysService implements OnApplicationBootstrap {
   }
 
   async remove(id: string) {
-    const pedido = await this.pedidoRepo.findOneBy({ id });
+    const pedido = await this.pedidoRepo.findOneBy({ id, negocio: this.config.clave });
 
     if (!pedido) throw new NotFoundException(`No existe el pedido ${id}`);
 
@@ -237,17 +287,17 @@ export class DelysService implements OnApplicationBootstrap {
    * ni cambiarle el precio a uno que sí existe.
    */
   private async dulcesDelCatalogo(ids: number[]) {
-    const encontrados = await this.dulceRepo.findBy({ id: In(ids) });
+    const encontrados = await this.dulceRepo.findBy({ id: In(ids), negocio: this.config.clave });
     const porId = new Map(encontrados.map((dulce) => [dulce.id, dulce]));
 
     const faltantes = [...new Set(ids)].filter((id) => !porId.has(id));
 
     if (faltantes.length === 1) {
-      throw new NotFoundException(`No existe el dulce ${faltantes[0]}`);
+      throw new NotFoundException(`No existe el ${this.config.articulo} ${faltantes[0]}`);
     }
 
     if (faltantes.length > 1) {
-      throw new NotFoundException(`No existen los dulces ${faltantes.join(', ')}`);
+      throw new NotFoundException(`No existen los ${this.config.articulo}s ${faltantes.join(', ')}`);
     }
 
     return porId;

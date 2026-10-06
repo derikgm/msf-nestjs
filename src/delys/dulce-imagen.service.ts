@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { Dulce } from './entities/index.js';
+import { NEGOCIO, type NegocioConfig } from './negocio.config.js';
 import { SupabaseService } from '../common/services/supabase.service.js';
 import { StorageQuotaService } from '../common/services/storage-quota.service.js';
 import type { AuthUser } from '../auth/auth.interfaces.js';
@@ -21,6 +22,13 @@ export class DulceImagenService {
   private readonly logger = new Logger(DulceImagenService.name);
 
   constructor(
+    /**
+     * Negocio del módulo que monta este servicio: el producto se busca **también**
+     * por `negocio`, porque Delys y ADC comparten tabla (punto 6) y un token de
+     * ADC no debe subir ni borrar la foto de un producto de Delys conociendo su id.
+     */
+    @Inject(NEGOCIO)
+    private readonly config: NegocioConfig,
     @Inject(getRepositoryToken(Dulce))
     private readonly dulceRepo: Repository<Dulce>,
     private readonly supabase: SupabaseService,
@@ -80,7 +88,7 @@ export class DulceImagenService {
     const dulce = await this.obtenerDulce(dulceId);
 
     if (!dulce.imagen_url) {
-      throw new BadRequestException(`El dulce ${dulceId} no tiene imagen`);
+      throw new BadRequestException(`El ${this.config.articulo} ${dulceId} no tiene imagen`);
     }
 
     const bytes = dulce.imagen_bytes ?? 0;
@@ -138,10 +146,10 @@ export class DulceImagenService {
   }
 
   private async obtenerDulce(id: number) {
-    const dulce = await this.dulceRepo.findOneBy({ id });
+    const dulce = await this.dulceRepo.findOneBy({ id, negocio: this.config.clave });
 
     if (!dulce) {
-      throw new BadRequestException(`No existe el dulce ${id}`);
+      throw new BadRequestException(`No existe el ${this.config.articulo} ${id}`);
     }
 
     return dulce;

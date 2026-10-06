@@ -12,6 +12,7 @@ import { numericTransformer } from '../../common/utils/numeric.transformer.js';
 let Pedido = class Pedido {
     id;
     precio_total;
+    negocio;
     direccion;
     telefono;
     fecha;
@@ -31,6 +32,10 @@ __decorate([
     }),
     __metadata("design:type", Number)
 ], Pedido.prototype, "precio_total", void 0);
+__decorate([
+    Column({ type: 'varchar', length: 16, default: 'delys' }),
+    __metadata("design:type", String)
+], Pedido.prototype, "negocio", void 0);
 __decorate([
     Column({ type: 'varchar', length: 300, nullable: true }),
     __metadata("design:type", Object)

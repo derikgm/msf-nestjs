@@ -2,8 +2,8 @@ import { Type } from 'class-transformer';
 import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 /**
- * Edición parcial de un dulce: se manda solo lo que cambia. Los dos campos son
- * opcionales, pero no pueden faltar los dos: `PATCH` sin nada que cambiar es un
+ * Edición parcial de un dulce: se manda solo lo que cambia. Los tres campos son
+ * opcionales, pero no pueden faltar los tres: `PATCH` sin nada que cambiar es un
  * error del cliente, no un no-op (lo comprueba `DelysService.actualizarDulce()`).
  *
  * La imagen no pasa por aquí. Tiene su propio par de rutas porque va como
@@ -27,4 +27,14 @@ export class UpdateDulceDto {
   )
   @Min(0, { message: 'El precio no puede ser negativo' })
   precio?: number;
+
+  /**
+   * Moneda del precio. Opcional: si no se manda, no se toca (sigue la que
+   * tuviera). Aquí solo se limita la longitud; la normalización a mayúsculas la
+   * hace `DelysService.actualizarDulce()`, igual que en el alta.
+   */
+  @IsOptional()
+  @IsString({ message: 'La moneda tiene que ser texto' })
+  @MaxLength(8, { message: 'La moneda no puede pasar de 8 letras' })
+  moneda?: string;
 }

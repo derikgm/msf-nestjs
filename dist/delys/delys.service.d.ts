@@ -4,15 +4,18 @@ import { CreatePedidoDto } from './dto/create-pedido.dto.js';
 import { CreateDulceDto } from './dto/create-dulce.dto.js';
 import { UpdateDulceDto } from './dto/update-dulce.dto.js';
 import { Dulce, Encargo, Pedido } from './entities/index.js';
+import { type NegocioConfig } from './negocio.config.js';
 import { DulceImagenService } from './dulce-imagen.service.js';
 import type { AuthUser } from '../auth/auth.interfaces.js';
 export declare class DelysService implements OnApplicationBootstrap {
+    private readonly config;
     private readonly pedidoRepo;
     private readonly encargoRepo;
     private readonly dulceRepo;
     private readonly imagenes;
     private readonly logger;
-    constructor(pedidoRepo: Repository<Pedido>, encargoRepo: Repository<Encargo>, dulceRepo: Repository<Dulce>, imagenes: DulceImagenService);
+    constructor(config: NegocioConfig, pedidoRepo: Repository<Pedido>, encargoRepo: Repository<Encargo>, dulceRepo: Repository<Dulce>, imagenes: DulceImagenService);
+    private articuloEnMayuscula;
     onApplicationBootstrap(): Promise<void>;
     crearPedido(createPedidoDto: CreatePedidoDto): Promise<{
         ok: boolean;
@@ -25,6 +28,7 @@ export declare class DelysService implements OnApplicationBootstrap {
         mensaje: string;
         dulce: Dulce;
     }>;
+    private normalizarMoneda;
     actualizarDulce(id: number, updateDulceDto: UpdateDulceDto): Promise<{
         mensaje: string;
         dulce: Dulce;

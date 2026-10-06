@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 /**
  * Alta de un dulce del catálogo, desde el panel de la pastelería.
@@ -26,4 +33,17 @@ export class CreateDulceDto {
   )
   @Min(0, { message: 'El precio no puede ser negativo' })
   precio: number;
+
+  /**
+   * Moneda en la que se lee `precio`. Opcional: si no llega, el servidor deja
+   * `CUP`, que es el valor por defecto de la columna.
+   *
+   * Es **texto y no un enum** a propósito (punto 5 del todo): mañana puede
+   * entrar el peso colombiano sin migrar nada. Solo se limita la longitud; la
+   * normalización a mayúsculas la hace el servicio.
+   */
+  @IsOptional()
+  @IsString({ message: 'La moneda tiene que ser texto' })
+  @MaxLength(8, { message: 'La moneda no puede pasar de 8 letras' })
+  moneda?: string;
 }

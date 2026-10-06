@@ -8,10 +8,11 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsString, MaxLength, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min, } from 'class-validator';
 export class CreateDulceDto {
     nombre;
     precio;
+    moneda;
 }
 __decorate([
     IsString({ message: 'El nombre tiene que ser texto' }),
@@ -25,4 +26,10 @@ __decorate([
     Min(0, { message: 'El precio no puede ser negativo' }),
     __metadata("design:type", Number)
 ], CreateDulceDto.prototype, "precio", void 0);
+__decorate([
+    IsOptional(),
+    IsString({ message: 'La moneda tiene que ser texto' }),
+    MaxLength(8, { message: 'La moneda no puede pasar de 8 letras' }),
+    __metadata("design:type", String)
+], CreateDulceDto.prototype, "moneda", void 0);
 //# sourceMappingURL=create-dulce.dto.js.map

@@ -15,6 +15,8 @@ let Dulce = class Dulce {
     precio;
     imagen_url;
     imagen_bytes;
+    moneda;
+    negocio;
 };
 __decorate([
     PrimaryColumn({ type: 'int' }),
@@ -41,8 +43,16 @@ __decorate([
     Column({ type: 'int', nullable: true }),
     __metadata("design:type", Object)
 ], Dulce.prototype, "imagen_bytes", void 0);
+__decorate([
+    Column({ type: 'varchar', length: 8, default: 'CUP' }),
+    __metadata("design:type", String)
+], Dulce.prototype, "moneda", void 0);
+__decorate([
+    Column({ type: 'varchar', length: 16, default: 'delys' }),
+    __metadata("design:type", String)
+], Dulce.prototype, "negocio", void 0);
 Dulce = __decorate([
-    Entity('dulce')
+    Entity('producto')
 ], Dulce);
 export { Dulce };
 //# sourceMappingURL=dulce.entity.js.map
