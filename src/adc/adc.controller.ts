@@ -14,11 +14,11 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DelysService } from '../delys/delys.service.js';
-import { DulceImagenService, type MulterFile } from '../delys/dulce-imagen.service.js';
-import { CreateDulceDto } from '../delys/dto/create-dulce.dto.js';
-import { CreatePedidoDto } from '../delys/dto/create-pedido.dto.js';
-import { UpdateDulceDto } from '../delys/dto/update-dulce.dto.js';
+import { CatalogoService } from '../common/services/catalogo.service.js';
+import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
+import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
+import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
+import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import type { AuthUser, RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -29,17 +29,17 @@ const TAMANO_MAXIMO_ARCHIVO = 50 * 1024 * 1024;
 const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 /**
- * Rutas de ADC: el espejo de `DelysController` con dos diferencias.
+ * Rutas de ADC: los propios endpoints de su negocio.
  *
  * 1. Se llaman `productos` y no `dulces`, tal como pide el enunciado del punto
- *    6 (`GET /adc/productos`). Los de Delys siguen en `/delys/dulces`.
+ *    6 (`GET /adc/productos`). Los de Delys van en `/delys/dulces`.
  * 2. Lo de gestión exige el rol `adc` (y la ruta pública de pedido se abre
  *    igual que en Delys: quien pide paneles no tiene cuenta).
  *
- * **La lógica no está duplicada**: el controlador solo llama a su propio
- * `DelysService`, y el módulo lo proporciona con `CONFIG_ADC`, de modo que sus
- * consultas filtran por `negocio = 'adc'`. Tablas y servicio se comparten; las
- * filas no se pisan.
+ * **La lógica está compartida, no duplicada**: el controlador usa `CatalogoService`,
+ * el servicio neutral del catálogo que comparte tabla, entidades y lógica entre
+ * negocios. `AdcModule` lo monta con `CONFIG_ADC`, de modo que sus consultas
+ * filtran por `negocio = 'adc'` y responden solo los productos de ADC (punto 6).
  *
  * Las claves de la respuesta hablan de `producto` (y no de `dulce`), que es el
  * idioma de este negocio: el servicio devuelve `dulce` porque así lo lee el
@@ -48,7 +48,7 @@ const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 @Controller('adc')
 export class AdcController {
   constructor(
-    private readonly delysService: DelysService,
+    private readonly catalogo: CatalogoService,
     private readonly imagenService: DulceImagenService,
   ) {}
 
@@ -56,17 +56,17 @@ export class AdcController {
   @Public()
   @Get('productos')
   async obtenerProductos() {
-    const { dulces } = await this.delysService.obtenerTodosDulces();
+    const { dulces } = await this.catalogo.obtenerTodosDulces();
 
     return { productos: dulces };
   }
 
   // Gestión del catálogo desde el panel de ADC. El id lo asigna el servidor,
-  // igual que en Delys (ver `DelysService.crearDulce()`).
+  // igual que en Delys (ver `CatalogoService.crearDulce()`).
   @Roles('adc')
   @Post('productos')
   async crearProducto(@Body() createDulceDto: CreateDulceDto) {
-    const { mensaje, dulce } = await this.delysService.crearDulce(createDulceDto);
+    const { mensaje, dulce } = await this.catalogo.crearDulce(createDulceDto);
 
     return { mensaje, producto: dulce };
   }
@@ -77,7 +77,7 @@ export class AdcController {
     @Param('id', new ParseIntPipe()) id: number,
     @Body() updateDulceDto: UpdateDulceDto,
   ) {
-    const { mensaje, dulce } = await this.delysService.actualizarDulce(id, updateDulceDto);
+    const { mensaje, dulce } = await this.catalogo.actualizarDulce(id, updateDulceDto);
 
     return { mensaje, producto: dulce };
   }
@@ -88,7 +88,7 @@ export class AdcController {
     @Param('id', new ParseIntPipe()) id: number,
     @Req() request: RequestConUsuario,
   ) {
-    return this.delysService.eliminarDulce(id, this.usuarioActual(request));
+    return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
   }
 
   // Imágenes: multipart/form-data con el archivo en el campo "imagen". La cuota
@@ -141,25 +141,25 @@ export class AdcController {
   @Public()
   @Post('pedido')
   agregarPedido(@Body() createPedidoDto: CreatePedidoDto) {
-    return this.delysService.crearPedido(createPedidoDto);
+    return this.catalogo.crearPedido(createPedidoDto);
   }
 
   @Roles('adc')
   @Get('pedidos')
   obtenerPedidos() {
-    return this.delysService.obtenerTodosPedidos();
+    return this.catalogo.obtenerTodosPedidos();
   }
 
   @Roles('adc')
   @Get('pedidos/:id')
   obtenerPedido(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.delysService.obtenerPedido(id);
+    return this.catalogo.obtenerPedido(id);
   }
 
   @Roles('adc')
   @Delete('pedidos/:id')
   borrarPedido(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.delysService.remove(id);
+    return this.catalogo.remove(id);
   }
 
   /** El JwtAuthGuard ya bloquea sin token; esto solo evita el undefined si se reutiliza. */

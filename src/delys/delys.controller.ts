@@ -14,11 +14,11 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DelysService } from './delys.service.js';
-import { DulceImagenService, type MulterFile } from './dulce-imagen.service.js';
-import { CreatePedidoDto } from './dto/create-pedido.dto.js';
-import { CreateDulceDto } from './dto/create-dulce.dto.js';
-import { UpdateDulceDto } from './dto/update-dulce.dto.js';
+import { CatalogoService } from '../common/services/catalogo.service.js';
+import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
+import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
+import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
+import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import type { AuthUser, RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -31,7 +31,7 @@ const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 @Controller('delys')
 export class DelysController {
   constructor(
-    private readonly delysService: DelysService,
+    private readonly catalogo: CatalogoService,
     private readonly imagenService: DulceImagenService,
   ) {}
 
@@ -39,23 +39,23 @@ export class DelysController {
   @Public()
   @Get('dulces')
   obtenerDulces() {
-    return this.delysService.obtenerTodosDulces();
+    return this.catalogo.obtenerTodosDulces();
   }
 
   @Public()
   @Get('ofertas')
   obtenerOfertas() {
-    return this.delysService.obtenerOfertas();
+    return this.catalogo.obtenerOfertas();
   }
 
   // Gestión del catálogo desde el panel de la pastelería. Estas tres rutas son
   // la contrapartida de que `POST /delys/pedido` ya no escriba el catálogo: el
   // pedido no lo toca, pero quien administra la vitrina sí puede.
-  // El id del dulce lo asigna el servidor; ver `DelysService.crearDulce()`.
+  // El id del dulce lo asigna el servidor; ver `CatalogoService.crearDulce()`.
   @Roles('delys')
   @Post('dulces')
   crearDulce(@Body() createDulceDto: CreateDulceDto) {
-    return this.delysService.crearDulce(createDulceDto);
+    return this.catalogo.crearDulce(createDulceDto);
   }
 
   @Roles('delys')
@@ -64,7 +64,7 @@ export class DelysController {
     @Param('id', new ParseIntPipe()) id: number,
     @Body() updateDulceDto: UpdateDulceDto,
   ) {
-    return this.delysService.actualizarDulce(id, updateDulceDto);
+    return this.catalogo.actualizarDulce(id, updateDulceDto);
   }
 
   @Roles('delys')
@@ -73,7 +73,7 @@ export class DelysController {
     @Param('id', new ParseIntPipe()) id: number,
     @Req() request: RequestConUsuario,
   ) {
-    return this.delysService.eliminarDulce(id, this.usuarioActual(request));
+    return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
   }
 
   // Imágenes: multipart/form-data con el archivo en el campo "imagen".
@@ -128,25 +128,25 @@ export class DelysController {
   @Public()
   @Post('pedido')
   agregarPedido(@Body() createPedidoDto: CreatePedidoDto) {
-    return this.delysService.crearPedido(createPedidoDto);
+    return this.catalogo.crearPedido(createPedidoDto);
   }
 
   @Roles('delys')
   @Get('pedidos')
   obtenerPedidos() {
-    return this.delysService.obtenerTodosPedidos();
+    return this.catalogo.obtenerTodosPedidos();
   }
 
   @Roles('delys')
   @Get('pedidos/:id')
   findOne(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.delysService.obtenerPedido(id);
+    return this.catalogo.obtenerPedido(id);
   }
 
   @Roles('delys')
   @Delete('pedidos/:id')
   remove(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.delysService.remove(id);
+    return this.catalogo.remove(id);
   }
 
   /** El JwtAuthGuard ya bloquea sin token, esto solo evita el undefined si se reutiliza. */

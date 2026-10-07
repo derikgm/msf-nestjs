@@ -97,7 +97,7 @@ Las columnas de entrega (`direccion`, `telefono`, `fecha`) son `nullable` solo p
 
 ### Startup del catalogo
 
-`DelysService.onApplicationBootstrap()` comprueba `count()` y luego inserta. Con dos instancias arrancando a la vez, las dos ven la tabla vacia e insertan el catalogo duplicado. Se arregla con `INSERT ... ON CONFLICT DO NOTHING`.
+`CatalogoService.onApplicationBootstrap()` (antes `DelysService`) comprueba `count()` y luego inserta. Con dos instancias arrancando a la vez, las dos ven la tabla vacia e insertan el catalogo duplicado. Se arregla con `INSERT ... ON CONFLICT DO NOTHING`.
 
 ### Seguridad
 

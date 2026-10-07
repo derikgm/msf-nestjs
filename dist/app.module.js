@@ -28,9 +28,9 @@ AppModule = __decorate([
                     url: configService.get('DATABASE_URL'),
                     autoLoadEntities: true,
                     synchronize: true,
-                    ssl: {
-                        rejectUnauthorized: false,
-                    },
+                    ssl: configService.get('DB_SSL') === 'false'
+                        ? false
+                        : { rejectUnauthorized: false },
                     connectTimeoutMS: 30000,
                     uuidExtension: 'pgcrypto',
                 }),

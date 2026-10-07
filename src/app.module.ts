@@ -20,9 +20,13 @@ import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
         url: configService.get<string>('DATABASE_URL'), // 👈 Usar cadena de conexión completa
         autoLoadEntities: true,
         synchronize: true,
-        ssl: {
-          rejectUnauthorized: false,
-        },
+        // Supabase exige SSL; el Postgres local no lo trae. En local se apaga
+        // poniendo DB_SSL=false; si no se define, se asume SSL (comportamiento
+        // original, el que usa el despliegue en Wasmer contra Supabase).
+        ssl:
+          configService.get<string>('DB_SSL') === 'false'
+            ? false
+            : { rejectUnauthorized: false },
         connectTimeoutMS: 30000,
         uuidExtension: 'pgcrypto', // para que los ids uuid se generen en Postgres
       }),

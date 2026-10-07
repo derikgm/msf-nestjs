@@ -6,10 +6,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { NEGOCIO } from '../delys/negocio.config.js';
-import { DelysService } from '../delys/delys.service.js';
-import { DulceImagenService } from '../delys/dulce-imagen.service.js';
-import { entities } from '../delys/entities/index.js';
+import { NEGOCIO } from '../common/config/negocio.config.js';
+import { CatalogoService } from '../common/services/catalogo.service.js';
+import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
+import { entities } from '../common/entities/index.js';
 import { StorageQuotaModule } from '../common/modules/storage-quota/storage-quota.module.js';
 import { SupabaseModule } from '../common/modules/supabase/supabase.module.js';
 import { AdcController } from './adc.controller.js';
@@ -20,7 +20,11 @@ AdcModule = __decorate([
     Module({
         imports: [TypeOrmModule.forFeature(entities), StorageQuotaModule, SupabaseModule],
         controllers: [AdcController],
-        providers: [{ provide: NEGOCIO, useValue: CONFIG_ADC }, DelysService, DulceImagenService],
+        providers: [
+            { provide: NEGOCIO, useValue: CONFIG_ADC },
+            CatalogoService,
+            DulceImagenService,
+        ],
     })
 ], AdcModule);
 export { AdcModule };

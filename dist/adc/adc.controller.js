@@ -12,36 +12,36 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Req, UploadedFile, UseInterceptors, } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DelysService } from '../delys/delys.service.js';
-import { DulceImagenService } from '../delys/dulce-imagen.service.js';
-import { CreateDulceDto } from '../delys/dto/create-dulce.dto.js';
-import { CreatePedidoDto } from '../delys/dto/create-pedido.dto.js';
-import { UpdateDulceDto } from '../delys/dto/update-dulce.dto.js';
+import { CatalogoService } from '../common/services/catalogo.service.js';
+import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
+import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
+import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
+import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 const TAMANO_MAXIMO_ARCHIVO = 50 * 1024 * 1024;
 const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 let AdcController = class AdcController {
-    delysService;
+    catalogo;
     imagenService;
-    constructor(delysService, imagenService) {
-        this.delysService = delysService;
+    constructor(catalogo, imagenService) {
+        this.catalogo = catalogo;
         this.imagenService = imagenService;
     }
     async obtenerProductos() {
-        const { dulces } = await this.delysService.obtenerTodosDulces();
+        const { dulces } = await this.catalogo.obtenerTodosDulces();
         return { productos: dulces };
     }
     async crearProducto(createDulceDto) {
-        const { mensaje, dulce } = await this.delysService.crearDulce(createDulceDto);
+        const { mensaje, dulce } = await this.catalogo.crearDulce(createDulceDto);
         return { mensaje, producto: dulce };
     }
     async actualizarProducto(id, updateDulceDto) {
-        const { mensaje, dulce } = await this.delysService.actualizarDulce(id, updateDulceDto);
+        const { mensaje, dulce } = await this.catalogo.actualizarDulce(id, updateDulceDto);
         return { mensaje, producto: dulce };
     }
     eliminarProducto(id, request) {
-        return this.delysService.eliminarDulce(id, this.usuarioActual(request));
+        return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
     }
     subirImagen(id, file, request) {
         if (!file) {
@@ -53,16 +53,16 @@ let AdcController = class AdcController {
         return this.imagenService.eliminar(id, this.usuarioActual(request));
     }
     agregarPedido(createPedidoDto) {
-        return this.delysService.crearPedido(createPedidoDto);
+        return this.catalogo.crearPedido(createPedidoDto);
     }
     obtenerPedidos() {
-        return this.delysService.obtenerTodosPedidos();
+        return this.catalogo.obtenerTodosPedidos();
     }
     obtenerPedido(id) {
-        return this.delysService.obtenerPedido(id);
+        return this.catalogo.obtenerPedido(id);
     }
     borrarPedido(id) {
-        return this.delysService.remove(id);
+        return this.catalogo.remove(id);
     }
     usuarioActual(request) {
         if (!request.user)
@@ -164,7 +164,7 @@ __decorate([
 ], AdcController.prototype, "borrarPedido", null);
 AdcController = __decorate([
     Controller('adc'),
-    __metadata("design:paramtypes", [DelysService,
+    __metadata("design:paramtypes", [CatalogoService,
         DulceImagenService])
 ], AdcController);
 export { AdcController };

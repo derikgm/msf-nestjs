@@ -1,4 +1,4 @@
-import type { NegocioConfig } from '../delys/negocio.config.js';
+import type { NegocioConfig } from '../common/config/negocio.config.js';
 
 /**
  * ADC: productos variados e instalación de paneles solares (punto 6 de

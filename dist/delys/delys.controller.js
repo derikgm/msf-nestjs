@@ -12,36 +12,36 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Req, UploadedFile, UseInterceptors, } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DelysService } from './delys.service.js';
-import { DulceImagenService } from './dulce-imagen.service.js';
-import { CreatePedidoDto } from './dto/create-pedido.dto.js';
-import { CreateDulceDto } from './dto/create-dulce.dto.js';
-import { UpdateDulceDto } from './dto/update-dulce.dto.js';
+import { CatalogoService } from '../common/services/catalogo.service.js';
+import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
+import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
+import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
+import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 const TAMANO_MAXIMO_ARCHIVO = 50 * 1024 * 1024;
 const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 let DelysController = class DelysController {
-    delysService;
+    catalogo;
     imagenService;
-    constructor(delysService, imagenService) {
-        this.delysService = delysService;
+    constructor(catalogo, imagenService) {
+        this.catalogo = catalogo;
         this.imagenService = imagenService;
     }
     obtenerDulces() {
-        return this.delysService.obtenerTodosDulces();
+        return this.catalogo.obtenerTodosDulces();
     }
     obtenerOfertas() {
-        return this.delysService.obtenerOfertas();
+        return this.catalogo.obtenerOfertas();
     }
     crearDulce(createDulceDto) {
-        return this.delysService.crearDulce(createDulceDto);
+        return this.catalogo.crearDulce(createDulceDto);
     }
     actualizarDulce(id, updateDulceDto) {
-        return this.delysService.actualizarDulce(id, updateDulceDto);
+        return this.catalogo.actualizarDulce(id, updateDulceDto);
     }
     eliminarDulce(id, request) {
-        return this.delysService.eliminarDulce(id, this.usuarioActual(request));
+        return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
     }
     subirImagen(id, file, request) {
         if (!file) {
@@ -53,16 +53,16 @@ let DelysController = class DelysController {
         return this.imagenService.eliminar(id, this.usuarioActual(request));
     }
     agregarPedido(createPedidoDto) {
-        return this.delysService.crearPedido(createPedidoDto);
+        return this.catalogo.crearPedido(createPedidoDto);
     }
     obtenerPedidos() {
-        return this.delysService.obtenerTodosPedidos();
+        return this.catalogo.obtenerTodosPedidos();
     }
     findOne(id) {
-        return this.delysService.obtenerPedido(id);
+        return this.catalogo.obtenerPedido(id);
     }
     remove(id) {
-        return this.delysService.remove(id);
+        return this.catalogo.remove(id);
     }
     usuarioActual(request) {
         if (!request.user)
@@ -171,7 +171,7 @@ __decorate([
 ], DelysController.prototype, "remove", null);
 DelysController = __decorate([
     Controller('delys'),
-    __metadata("design:paramtypes", [DelysService,
+    __metadata("design:paramtypes", [CatalogoService,
         DulceImagenService])
 ], DelysController);
 export { DelysController };
