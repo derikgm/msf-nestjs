@@ -15,9 +15,11 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/delys/ofertas` | público |
 | `GET` | `/delys/secciones` | público |
 | `POST` | `/delys/secciones` | `delys` o `admin`, **alta de sección** |
-| `GET` | `/adc/productos` | público, devuelve `productos` **y** `secciones`, sin la sección `dulces` |
-| `GET` | `/adc/secciones` | público, sin la sección `dulces` |
+| `GET` | `/adc/productos` | público, devuelve `productos` **y** `secciones` |
+| `GET` | `/adc/secciones` | público |
 | `POST` | `/adc/secciones` | `adc` o `admin`, **alta de sección** |
+| `PATCH` | `/adc/secciones/:id` | `adc` o `admin`, **renombra una sección** |
+| `DELETE` | `/adc/secciones/:id` | `adc` o `admin`, **borra una sección vacía** |
 | `POST` | `/auth/login` | público |
 | `POST` | `/auth/registro` | público, **solo** mientras el rol no tenga usuarios |
 | `POST` | `/auth/usuarios` | cualquier rol, crea usuarios **de ese mismo rol** |
@@ -581,13 +583,13 @@ Un dulce se puede borrar siempre que sus pedidos estén resueltos: al resolver u
 
 ### 20. Secciones del catálogo
 
-El catálogo se navega por secciones (tabla `seccion`), y cada producto pertenece a una (`producto.seccion_id`). La sección **`dulces`** es la especial del catálogo heredado: los productos que existían antes de las secciones se migran ahí. La pastelería la muestra con normalidad (es donde vive todo su catálogo); **ADC la esconde** porque es el catálogo ajeno.
+El catálogo se navega por secciones (tabla `seccion`), y cada producto pertenece a una (`producto.seccion_id`). La sección **`dulces`** es la especial del catálogo heredado: los productos que existían antes de las secciones (y los que se dan de alta sin `seccion_id`) acaban ahí. **Ambos negocios la enseñan con normalidad**: lo que separa un proyecto de otro es la columna `negocio`, no el nombre de la sección, así que `GET /adc/productos` ya no esconde nada. Ese nombre sí está **reservado**: el panel no puede crear ni renombrar secciones a `dulces`.
 
 Los nombres se guardan en minúsculas (`Electronico` pasa a `electronico`) y deben ser únicos dentro de cada negocio.
 
 #### 20.1. `GET /delys/secciones` y `GET /adc/secciones`
 
-Públicas. Devuelven las secciones del negocio, en orden de creación, **sin** la sección `dulces` en el caso de ADC:
+Públicas. Devuelven las secciones del negocio, en orden de creación:
 
 ```bash
 curl localhost:3000/delys/secciones
@@ -609,6 +611,7 @@ curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
 | Situación | Respuesta |
 | --- | --- |
 | `nombre` vacío o de más de 60 letras | `400` |
+| nombre `dulces` (reservado) | `400`: `"dulces" es la sección reservada del catálogo heredado: elige otro nombre` |
 | sección repetida en el mismo negocio | `409`: `La sección "electronico" ya existe` |
 | sin token / rol equivocado | `401` / `403` |
 
@@ -624,7 +627,7 @@ curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
 
 #### 20.4. `GET /adc/productos`
 
-Devuelve **productos y secciones**, y excluye la sección `dulces` (ni la lista ni los productos que viven en ella):
+Devuelve **productos y secciones** del negocio, con todo lo que haya (también los productos que aún no se hayan movido de `dulces`):
 
 ```bash
 curl localhost:3000/adc/productos
@@ -636,6 +639,43 @@ curl localhost:3000/adc/productos
 ```
 
 `/delys/dulces` no cambia de forma: sigue devolviendo los dulces con su `seccion_id` y su objeto `seccion` encima.
+
+#### 20.5. `PATCH /adc/secciones/:id`
+
+Renombra una sección (solo ADC, con token `adc` o `admin`). El cuerpo es el mismo que en el alta: `{"nombre": "nuevo nombre"}`.
+
+```bash
+curl -X PATCH localhost:3000/adc/secciones/4 -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" -d '{"nombre":"Paneles solares"}'
+# -> { "mensaje": "Sección actualizada correctamente", "seccion": { "id": 4, "nombre": "paneles solares", ... } }
+```
+
+| Situación | Respuesta |
+| --- | --- |
+| la sección no existe o es de otro negocio | `404`: `No existe la sección 4` |
+| nombre vacío o `dulces` (reservado) | `400` |
+| ya hay otra sección con ese nombre | `409`: `La sección "paneles solares" ya existe` |
+| sin token / rol equivocado | `401` / `403` |
+
+El cambio se ve en la tienda en la siguiente lectura: `GET /adc/productos` agrupa por el nombre nuevo y los productos se quedan donde estaban (se mueven desde el panel con `PATCH /adc/productos/:id` y su `seccion_id`).
+
+#### 20.6. `DELETE /adc/secciones/:id`
+
+Borra una sección **vacía** (solo ADC, con token `adc` o `admin`):
+
+```bash
+curl -X DELETE localhost:3000/adc/secciones/4 -H "Authorization: Bearer eyJ..."
+# -> { "ok": true }
+```
+
+| Situación | Respuesta |
+| --- | --- |
+| la sección no existe o es de otro negocio | `404`: `No existe la sección 4` |
+| **tiene productos** | `409`: `La sección "paneles solares" tiene 3 productos: móvelos a otra sección antes de borrarla` |
+| es la sección `dulces` (reservada) | `400`: `La sección "dulces" es la de reserva: no se puede borrar` |
+| sin token / rol equivocado | `401` / `403` |
+
+No se borra nada con productos dentro, ni se los manda a escondidas: `producto.seccion_id` es una clave foránea sin `ON DELETE`, así que la base lo rechazaría igual, y mandarlos a `dulces` los escondería de la tienda. Primero se reubican (`PATCH` con `seccion_id`) y después se borra la sección.
 
 ---
 

@@ -32,9 +32,8 @@ let AdcController = class AdcController {
     async obtenerProductos() {
         const { dulces } = await this.catalogo.obtenerTodosDulces();
         const { secciones } = await this.catalogo.listarSecciones();
-        const visibles = dulces.filter((dulce) => dulce.seccion?.nombre !== 'dulces');
         return {
-            productos: visibles.map((dulce) => ({
+            productos: dulces.map((dulce) => ({
                 id: dulce.id,
                 nombre: dulce.nombre,
                 precio: dulce.precio,
@@ -43,21 +42,23 @@ let AdcController = class AdcController {
                 seccion_id: dulce.seccion?.id ?? null,
                 seccion: dulce.seccion?.nombre ?? null,
             })),
-            secciones: secciones
-                .filter((seccion) => seccion.nombre !== 'dulces')
-                .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+            secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
         };
     }
     async obtenerSecciones() {
         const { secciones } = await this.catalogo.listarSecciones();
         return {
-            secciones: secciones
-                .filter((seccion) => seccion.nombre !== 'dulces')
-                .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+            secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
         };
     }
     crearSeccion(createSeccionDto) {
         return this.catalogo.crearSeccion(createSeccionDto.nombre);
+    }
+    actualizarSeccion(id, createSeccionDto) {
+        return this.catalogo.actualizarSeccion(id, createSeccionDto.nombre);
+    }
+    eliminarSeccion(id) {
+        return this.catalogo.eliminarSeccion(id);
     }
     async crearProducto(createDulceDto) {
         const { mensaje, dulce } = await this.catalogo.crearDulce(createDulceDto);
@@ -119,6 +120,23 @@ __decorate([
     __metadata("design:paramtypes", [CreateSeccionDto]),
     __metadata("design:returntype", void 0)
 ], AdcController.prototype, "crearSeccion", null);
+__decorate([
+    Roles('adc'),
+    Patch('secciones/:id'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __param(1, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, CreateSeccionDto]),
+    __metadata("design:returntype", void 0)
+], AdcController.prototype, "actualizarSeccion", null);
+__decorate([
+    Roles('adc'),
+    Delete('secciones/:id'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], AdcController.prototype, "eliminarSeccion", null);
 __decorate([
     Roles('adc'),
     Post('productos'),
