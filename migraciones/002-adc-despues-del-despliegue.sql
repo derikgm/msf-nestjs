@@ -38,9 +38,9 @@ BEGIN
     SELECT 1 FROM pg_constraint
      WHERE conrelid = 'encargo'::regclass
        AND contype = 'f'
-       AND conname = 'FK_076eddea4df066f1958df261fa8'
+       AND lower(conname) = lower('FK_076eddea4df066f1958df261fa8')
   ) THEN
-    ALTER TABLE encargo DROP CONSTRAINT FK_076eddea4df066f1958df261fa8;
+    ALTER TABLE encargo DROP CONSTRAINT "FK_076eddea4df066f1958df261fa8";
   END IF;
 END $$;
 
@@ -53,7 +53,7 @@ BEGIN
        AND conname = 'FK_076eddea4df066f1958df261fa8'
   ) THEN
     ALTER TABLE encargo
-      ADD CONSTRAINT FK_076eddea4df066f1958df261fa8
+      ADD CONSTRAINT "FK_076eddea4df066f1958df261fa8"
       FOREIGN KEY (dulce_id) REFERENCES producto(id) ON DELETE RESTRICT;
   END IF;
 END $$;

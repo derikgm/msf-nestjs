@@ -65,15 +65,21 @@ ALTER TABLE pedido
 -- Los dos bloques son defensivos: solo actúan si hace falta.
 -- ────────────────────────────────────────────────────────────────────────────
 DO $$
+DECLARE
+  nombre_del_fk text;
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_constraint
-     WHERE conrelid = 'encargo'::regclass
-       AND contype = 'f'
-       AND conname = 'FK_076eddea4df066f1958df261fa8'
-       AND pg_get_constraintdef(oid) LIKE '%ON DELETE CASCADE%'
-  ) THEN
-    ALTER TABLE encargo DROP CONSTRAINT FK_076eddea4df066f1958df261fa8;
+  -- La FK la crea TypeORM con el nombre entre comillas (o sea, con mayusculas
+  -- conservadas) o el esquema viejo con minusculas: se busca por nombre sin
+  -- importar las mayusculas y se suelta con %I para no romper el quoting.
+  SELECT conname INTO nombre_del_fk
+    FROM pg_constraint
+   WHERE conrelid = 'encargo'::regclass
+     AND contype = 'f'
+     AND lower(conname) = lower('FK_076eddea4df066f1958df261fa8')
+     AND pg_get_constraintdef(oid) LIKE '%ON DELETE CASCADE%';
+
+  IF nombre_del_fk IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE encargo DROP CONSTRAINT %I', nombre_del_fk);
   END IF;
 END $$;
 
@@ -83,10 +89,10 @@ BEGIN
     SELECT 1 FROM pg_constraint
      WHERE conrelid = 'encargo'::regclass
        AND contype = 'f'
-       AND conname = 'FK_076eddea4df066f1958df261fa8'
+       AND lower(conname) = lower('FK_076eddea4df066f1958df261fa8')
   ) THEN
     ALTER TABLE encargo
-      ADD CONSTRAINT FK_076eddea4df066f1958df261fa8
+      ADD CONSTRAINT "FK_076eddea4df066f1958df261fa8"
       FOREIGN KEY (dulce_id) REFERENCES producto(id) ON DELETE RESTRICT;
   END IF;
 END $$;
