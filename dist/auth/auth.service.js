@@ -40,7 +40,7 @@ let AuthService = class AuthService {
                 sub: usuario.id,
                 usuario: usuario.usuario,
                 rol: usuario.rol,
-            }),
+            }, { expiresIn: this.expiresIn }),
             token_type: 'Bearer',
             expires_in: this.expiresIn,
         };

@@ -46,11 +46,18 @@ export class AuthService {
     }
 
     return {
-      access_token: await this.jwtService.signAsync({
-        sub: usuario.id,
-        usuario: usuario.usuario,
-        rol: usuario.rol,
-      }),
+      // Sin la segunda palabra, el JWT salía **sin claim `exp`**: el token no
+      // caducaba nunca y el `expires_in` de la respuesta era decorativo (N-1).
+      // `expiresIn` en segundos es lo que ya calculaba `parseDurationToSeconds`
+      // para ese campo, así que la respuesta y el token dicen lo mismo.
+      access_token: await this.jwtService.signAsync(
+        {
+          sub: usuario.id,
+          usuario: usuario.usuario,
+          rol: usuario.rol,
+        },
+        { expiresIn: this.expiresIn },
+      ),
       token_type: 'Bearer',
       expires_in: this.expiresIn,
     };
