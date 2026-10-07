@@ -136,6 +136,38 @@ Cómo se mantiene el contador:
 
 Pendiente para producción: limitar intentos de login (`@nestjs/throttler`) y registrar los accesos en un log de auditoría.
 
+## Cambiar el esquema de la base de datos
+
+Desde 2026-10-07 el servidor **no** ajusta el esquema solo: `synchronize` está en `false` (N-4).
+Antes estaba en `true` y TypeORM adivinaba el esquema en cada arranque: añadía columnas y, sobre
+todo, **borraba** las que la entidad no conocía (véase la advertencia de `migraciones/001-moneda.sql`,
+donde una columna aparecía y desaparecía al enfriarse Wasmer). Ahora el esquema solo cambia con una
+migración, y `migrationsRun` la aplica al arrancar.
+
+Cómo se hace un cambio:
+
+```bash
+npm run build     # no hay ts-node: el CLI trabaja contra dist/
+node --env-file=.env node_modules/.bin/typeorm migration:generate -d dist/data-source.js <nombre>
+# -> se crea src/migraciones/<timestamp>-<nombre>.ts; revisarlo
+git add src/migraciones/ && git commit   # y desplegar: se aplica sola al arrancar
+```
+
+Útiles:
+
+```bash
+node --env-file=.env node_modules/.bin/typeorm migration:show -d dist/data-source.js   # pendientes
+node --env-file=.env node_modules/.bin/typeorm migration:run  -d dist/data-source.js   # aplicar a mano
+```
+
+Aviso: el `DATABASE_URL` del `.env` es el de producción. `migration:generate` solo lee, pero
+`migration:run` ejecuta: mirar bien a qué base apunta.
+
+La de línea base (`src/migraciones/1791390744944-Inicial.ts`) deja escrito el esquema que tenían
+las bases creadas hasta ahora. En esas bases **no hace nada** (se salta si la tabla `producto` ya
+existe) y su `down()` no borra nada: una línea base no se revierte, eso es trabajo de una copia
+de seguridad. Las bases nuevas sí la crean entera.
+
 ## Deploying to Wasmer (Overview)
 
 1. Install dependencies and confirm the app starts locally.

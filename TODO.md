@@ -47,7 +47,7 @@ Pendientes y cosas que hay que arreglar. Sin deadlines todavía; es una lista de
 - [x] Migrar la BD de producción con `migraciones/migracion-produccion.sql` **antes** del deploy (hecho).
 - [ ] Tras el deploy en Wasmer, verificar en producción: `GET /delys/dulces` devuelve los datos reales (no la semilla) y `GET /delys/secciones` trae `dulces`.
 - [ ] (opcional) Frontend ADC: consumir `secciones` y `seccion_id`, y el `POST /adc/secciones` desde su panel.
-- [ ] (opcional, ver "Migraciones pendientes" abajo) cuando se desactive `synchronize`: generar la migración formal de TypeORM para `seccion`/`seccion_id`.
+- [x] (ver "Migraciones pendientes" abajo) cuando se desactive `synchronize`: generar la migración formal de TypeORM para `seccion`/`seccion_id`. **Hecho (2026-10-07):** `synchronize` está en `false` y la línea base `src/migraciones/1791390744944-Inicial.ts` ya incluye `seccion` y la clave foránea `producto.seccion_id`.
 - [ ] Recordar que `pkill -f "node server.js"` se mata a sí mismo (el patrón coincide con el comando): usar `pgrep -f "[n]ode server.js"` o `kill <pid>`.
 
 ---
@@ -160,9 +160,17 @@ curl -X POST http://127.0.0.1:3000/auth/login \
 
 ### Migraciones pendientes
 
-La tabla `storage_quota` se crea sola con `synchronize: true`. Cuando eso se desactive hay que generar la migración de `usuario`, `storage_quota`, las columnas `dulce.imagen_bytes` / `dulce.imagen_url` y las cuatro columnas de entrega de `pedido`.
+**Resuelto (2026-10-07).** `synchronize` está ya en `false` y la línea base
+`src/migraciones/1791390744944-Inicial.ts` deja escrito el esquema completo de entonces:
+`usuario`, `storage_quota`, `producto` (con `imagen_bytes` / `imagen_url`) y las cuatro columnas
+de entrega de `pedido`. En las bases creadas antes no hace nada (se salta); en una base nueva lo
+crea entero. Cómo se escribe una migración nueva: README, sección «Cambiar el esquema de la base
+de datos».
 
-Las columnas de entrega (`direccion`, `telefono`, `fecha`) son `nullable` solo porque `synchronize: true` no puede añadir una columna NOT NULL a una tabla con filas. Cuando se escriban las migraciones y se vacíe la tabla, deben volver a ser NOT NULL y los tipos de `delys.interfaces.ts` pasan de `string | null` a `string`.
+Las columnas de entrega (`direccion`, `telefono`, `fecha`) son `nullable` solo porque con
+`synchronize: true` no se podía añadir una columna NOT NULL a una tabla con filas. Ahora que el
+esquema se toca con migraciones, **sigue pendiente** vaciar la tabla y devolverlas a NOT NULL, y
+pasar los tipos de `delys.interfaces.ts` de `string | null` a `string`.
 
 ### Startup del catalogo
 

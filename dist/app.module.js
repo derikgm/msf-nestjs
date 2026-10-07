@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { StorageQuotaModule } from './common/modules/storage-quota/storage-quota.module.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -27,7 +28,10 @@ AppModule = __decorate([
                     type: 'postgres',
                     url: configService.get('DATABASE_URL'),
                     autoLoadEntities: true,
-                    synchronize: true,
+                    synchronize: false,
+                    migrations: [Inicial1791390744944],
+                    migrationsTableName: 'migrations',
+                    migrationsRun: true,
                     ssl: configService.get('DB_SSL') === 'false'
                         ? false
                         : { rejectUnauthorized: false },
