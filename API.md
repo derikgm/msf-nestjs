@@ -16,6 +16,8 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/delys/secciones` | público |
 | `POST` | `/delys/secciones` | `delys` o `admin`, **alta de sección** |
 | `GET` | `/adc/productos` | público, devuelve `productos` **y** `secciones` |
+| `POST` | `/adc/productos/:id/imagen` | `adc` o `admin`, sube la foto; la respuesta trae la clave **`producto`** (no `dulce`) |
+| `DELETE` | `/adc/productos/:id/imagen` | `adc` o `admin`, quita la foto; igual, clave **`producto`** |
 | `GET` | `/adc/secciones` | público |
 | `POST` | `/adc/secciones` | `adc` o `admin`, **alta de sección** |
 | `PATCH` | `/adc/secciones/:id` | `adc` o `admin`, **renombra una sección** |
