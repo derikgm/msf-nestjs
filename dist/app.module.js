@@ -5,6 +5,8 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
 import { DelysModule } from './delys/delys.module.js';
 import { AdcModule } from './adc/adc.module.js';
 import { ControlModule } from './control/control.module.js';
@@ -20,6 +22,15 @@ AppModule = __decorate([
         imports: [
             ConfigModule.forRoot({
                 isGlobal: true,
+            }),
+            ThrottlerModule.forRoot({
+                throttlers: [
+                    {
+                        name: 'default',
+                        ttl: minutes(1),
+                        limit: 300,
+                    },
+                ],
             }),
             TypeOrmModule.forRootAsync({
                 imports: [ConfigModule],
@@ -46,7 +57,7 @@ AppModule = __decorate([
             StorageQuotaModule,
         ],
         controllers: [],
-        providers: [],
+        providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
     })
 ], AppModule);
 export { AppModule };

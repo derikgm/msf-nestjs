@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
 import { DelysModule } from './delys/delys.module.js';
 import { AdcModule } from './adc/adc.module.js';
 import { ControlModule } from './control/control.module.js';
@@ -12,6 +14,27 @@ import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    /**
+     * N-5 · Rate limiting: `300` peticiones por minuto e IP como techo general
+     * (una tienda recorriendo catálogo, imágenes y login no se acerca) y, en
+     * las cuatro rutas que se fuerzan sin cuenta —`POST /auth/login`,
+     * `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`—
+     * `@Throttle` las baja a `10` por minuto (ver cada controlador).
+     *
+     * Ojo con dos cosas: el `ttl` va en **milisegundos** (de ahí el helper
+     * `minutes()`), y el guard se registra globalmente con `APP_GUARD`, así
+     * que `@SkipThrottle()` es la vía de escape si alguna ruta llegara a
+     * necesitarlo.
+     */
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          name: 'default',
+          ttl: minutes(1),
+          limit: 300,
+        },
+      ],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -52,6 +75,6 @@ import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
     StorageQuotaModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
