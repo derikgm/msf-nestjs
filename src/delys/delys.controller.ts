@@ -14,6 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { minutes, Throttle } from '@nestjs/throttler';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
@@ -141,9 +142,10 @@ export class DelysController {
 
   // Alta de pedidos: pública. El cliente de la pastelería no tiene cuenta, así que
   // no puede llevar token; el resto de rutas de pedidos sí lo exigen, porque esas
-  // son las del panel (ver, borrar). Pendiente: @nestjs/throttler en esta ruta.
+  // son las del panel (ver, borrar). N-5: acotada a 10 por minuto e IP.
   @Public()
   @Post('pedido')
+  @Throttle({ default: { limit: 10, ttl: minutes(1) } })
   agregarPedido(@Body() createPedidoDto: CreatePedidoDto) {
     return this.catalogo.crearPedido(createPedidoDto);
   }

@@ -8,6 +8,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   /**
+   * Detrás del proxy de Wasmer, la IP que llega al servidor es la suya y no la
+   * del cliente. Sin esto, el rate limiting (N-5) contaría **todas** las
+   * peticiones de todos los visitantes en el mismo cubo: con la tienda llena,
+   * alguien intentaría entrar y todo el mundo recibiría 429. Con `1` solo se
+   * fía de los primeros saltos, que es lo que pone el proxy.
+   */
+  app.set('trust proxy', 1);
+
+  /**
    * CORS con lista blanca (N-3 / X-6).
    *
    * Antes era `enableCors()` a secas: cualquier página podía leer las

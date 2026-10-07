@@ -7,6 +7,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import { minutes, Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
@@ -21,9 +22,11 @@ import { Roles } from './roles.decorator.js';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  /** N-5 · intentos de acceso: 10 por minuto e IP, que un adivinador de contraseñas no pueda probar a machete. */
   @Public()
   @Post('login')
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: minutes(1) } })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
@@ -31,9 +34,12 @@ export class AuthController {
   /**
    * Alta inicial: mientras el rol no tenga ningún usuario cualquiera puede crear el
    * primero. Si ya existe, hace falta token y se exige el mismo rol.
+   *
+   * N-5 · también acotada: sin cuenta que validar, es la otra puerta abierta.
    */
   @Public()
   @Post('registro')
+  @Throttle({ default: { limit: 10, ttl: minutes(1) } })
   crearPrimerUsuario(@Body() dto: CreateUsuarioDto, @Req() request: RequestConUsuario) {
     return this.authService.register(dto, request.user);
   }

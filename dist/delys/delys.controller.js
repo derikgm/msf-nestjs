@@ -12,6 +12,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Req, UploadedFile, UseInterceptors, } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { minutes, Throttle } from '@nestjs/throttler';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
@@ -163,6 +164,7 @@ __decorate([
 __decorate([
     Public(),
     Post('pedido'),
+    Throttle({ default: { limit: 10, ttl: minutes(1) } }),
     __param(0, Body()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [CreatePedidoDto]),

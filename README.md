@@ -134,7 +134,28 @@ Cómo se mantiene el contador:
 * al borrar una imagen, o al reemplazarla por otra, se liberan los bytes de la anterior;
 * si no alcanza, la respuesta es un `400` diciendo cuántos bytes se usan, cuántos hay y cuánto pesa el archivo.
 
-Pendiente para producción: limitar intentos de login (`@nestjs/throttler`) y registrar los accesos en un log de auditoría.
+## Límite de peticiones (rate limiting)
+
+Desde 2026-10-07 (`@nestjs/throttler`, N-5) la API corta a quien sature:
+
+| Dónde | Límite |
+| --- | --- |
+| Cualquier ruta | `300` peticiones por minuto e IP |
+| `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido` | `10` por minuto e IP |
+
+Se responde con `429 {"statusCode":429,"message":"ThrottlerException: Too Many Requests"}` y la
+ventana vuelve a estar libre a los `60` segundos. Las `GET` de las tiendas públicas están muy por
+debajo del techo general: recorrer el catálogo no dispara nada.
+
+Dos detalles que no conviene tocar a la ligera:
+
+* el `ttl` va en **milisegundos** (`minutes(1)` es `60000`); cambiarlo por `60` reduciría la
+  ventana a 60 milisegundos;
+* `server.js` pone `app.set('trust proxy', 1)`: detrás del proxy de Wasmer la IP que llega es la
+  suya, y sin ese ajuste todos los visitantes contarían en el mismo cubo y una tienda llena se
+  bloquearía sola. Con `1` solo se fía el último salto que pone el proxy.
+
+Sigue pendiente para producción: registrar los accesos en un log de auditoría.
 
 ## Cambiar el esquema de la base de datos
 
