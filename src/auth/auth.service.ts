@@ -72,6 +72,19 @@ export class AuthService {
    */
   async register(dto: CreateUsuarioDto, caller?: AuthUser) {
     const rol = caller?.rol ?? dto.rol ?? 'delys';
+
+    // Sin token esta ruta es pública y solo sirve para arrancar un proyecto
+    // nuevo; **nunca** para el superusuario (N-2). Como el rol `admin` no tiene
+    // ningún usuario, cualquiera podía darse de alta como admin desde fuera y
+    // ya podía crear usuarios, leer los dos catálogos y cambiar cualquier cosa.
+    // El admin se da de alta con token de admin o desde el servidor: aquí se
+    // rechaza antes de mirar si el rol está vacío, para que el motivo sea claro.
+    if (!caller && rol === ROL_SUPERUSUARIO) {
+      throw new ForbiddenException(
+        'El rol admin no se da de alta por el registro público: créalo con POST /auth/admin/usuarios (hace falta token de admin) o desde el servidor',
+      );
+    }
+
     const yaHayUsuarios = await this.hayUsuariosDelRol(rol);
 
     if (yaHayUsuarios && caller?.rol !== rol) {
