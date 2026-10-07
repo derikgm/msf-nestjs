@@ -16,6 +16,8 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/delys/secciones` | público |
 | `POST` | `/delys/secciones` | `delys` o `admin`, **alta de sección** |
 | `GET` | `/adc/productos` | público, devuelve `productos` **y** `secciones` |
+| `POST` | `/adc/productos/:id/imagen` | `adc` o `admin`, sube la foto; la respuesta trae la clave **`producto`** (no `dulce`) |
+| `DELETE` | `/adc/productos/:id/imagen` | `adc` o `admin`, quita la foto; igual, clave **`producto`** |
 | `GET` | `/adc/secciones` | público |
 | `POST` | `/adc/secciones` | `adc` o `admin`, **alta de sección** |
 | `PATCH` | `/adc/secciones/:id` | `adc` o `admin`, **renombra una sección** |
@@ -107,7 +109,13 @@ Alta del **primer** usuario de un proyecto. Sin token mientras el rol esté vac�
 | `nombre` | string | obligatorio, máx. 120 |
 | `usuario` | string | obligatorio, máx. 60, único |
 | `password` | string | obligatorio, entre 8 y 200 caracteres |
-| `rol` | string | opcional, `delys`, `domus` o `admin`. Si se omite, `delys` |
+| `rol` | string | opcional, `delys`, `domus` o `adc`. Si se omite, `delys`. **Nunca `admin`**: sin token esta ruta no crea superusuarios (ver más abajo) |
+
+> **`admin` no se puede crear aquí.** Si el rol `admin` está vacío, esta ruta
+> hubiera permitido que cualquiera se hiciera superusuario; ahora responde
+> `403` con ese motivo. Para el primer administrador hay que usar
+> `POST /auth/admin/usuarios` (con token de admin existente) o crearlo desde el
+> servidor.
 
 ```bash
 # Primer arranque del proyecto delys: la tabla usuario está vacía.

@@ -40,13 +40,16 @@ let AuthService = class AuthService {
                 sub: usuario.id,
                 usuario: usuario.usuario,
                 rol: usuario.rol,
-            }),
+            }, { expiresIn: this.expiresIn }),
             token_type: 'Bearer',
             expires_in: this.expiresIn,
         };
     }
     async register(dto, caller) {
         const rol = caller?.rol ?? dto.rol ?? 'delys';
+        if (!caller && rol === ROL_SUPERUSUARIO) {
+            throw new ForbiddenException('El rol admin no se da de alta por el registro público: créalo con POST /auth/admin/usuarios (hace falta token de admin) o desde el servidor');
+        }
         const yaHayUsuarios = await this.hayUsuariosDelRol(rol);
         if (yaHayUsuarios && caller?.rol !== rol) {
             throw new UnauthorizedException('El registro está cerrado: pídele a un usuario de ese rol que te cree la cuenta');
