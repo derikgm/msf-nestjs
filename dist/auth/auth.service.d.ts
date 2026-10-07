@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
+import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { Usuario } from './entities/index.js';
 import { AuthUser } from './auth.interfaces.js';
@@ -23,7 +24,7 @@ export declare class AuthService {
             id: string;
             nombre: string;
             usuario: string;
-            rol: "delys" | "domus" | "admin";
+            rol: "delys" | "domus" | "adc" | "admin";
         };
     }>;
     crearUsuario(dto: CreateUsuarioDto, caller: AuthUser): Promise<{
@@ -32,7 +33,16 @@ export declare class AuthService {
             id: string;
             nombre: string;
             usuario: string;
-            rol: "delys" | "domus" | "admin";
+            rol: "delys" | "domus" | "adc" | "admin";
+        };
+    }>;
+    crearUsuarioAdmin(dto: CreateUsuarioAdminDto, caller: AuthUser): Promise<{
+        mensaje: string;
+        usuario: {
+            id: string;
+            nombre: string;
+            usuario: string;
+            rol: "delys" | "domus" | "adc" | "admin";
         };
     }>;
     changePassword(caller: AuthUser, dto: ChangePasswordDto): Promise<{

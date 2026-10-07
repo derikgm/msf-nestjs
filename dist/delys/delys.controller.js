@@ -10,27 +10,45 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, ParseUUIDPipe, Post, Req, UploadedFile, UseInterceptors, } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Req, UploadedFile, UseInterceptors, } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { DelysService } from './delys.service.js';
-import { DulceImagenService } from './dulce-imagen.service.js';
-import { CreatePedidoDto } from './dto/create-pedido.dto.js';
+import { CatalogoService } from '../common/services/catalogo.service.js';
+import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
+import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
+import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
+import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
+import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 const TAMANO_MAXIMO_ARCHIVO = 50 * 1024 * 1024;
 const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 let DelysController = class DelysController {
-    delysService;
+    catalogo;
     imagenService;
-    constructor(delysService, imagenService) {
-        this.delysService = delysService;
+    constructor(catalogo, imagenService) {
+        this.catalogo = catalogo;
         this.imagenService = imagenService;
     }
     obtenerDulces() {
-        return this.delysService.obtenerTodosDulces();
+        return this.catalogo.obtenerTodosDulces();
     }
     obtenerOfertas() {
-        return this.delysService.obtenerOfertas();
+        return this.catalogo.obtenerOfertas();
+    }
+    obtenerSecciones() {
+        return this.catalogo.listarSecciones();
+    }
+    crearSeccion(createSeccionDto) {
+        return this.catalogo.crearSeccion(createSeccionDto.nombre);
+    }
+    crearDulce(createDulceDto) {
+        return this.catalogo.crearDulce(createDulceDto);
+    }
+    actualizarDulce(id, updateDulceDto) {
+        return this.catalogo.actualizarDulce(id, updateDulceDto);
+    }
+    eliminarDulce(id, request) {
+        return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
     }
     subirImagen(id, file, request) {
         if (!file) {
@@ -42,16 +60,16 @@ let DelysController = class DelysController {
         return this.imagenService.eliminar(id, this.usuarioActual(request));
     }
     agregarPedido(createPedidoDto) {
-        return this.delysService.crearPedido(createPedidoDto);
+        return this.catalogo.crearPedido(createPedidoDto);
     }
     obtenerPedidos() {
-        return this.delysService.obtenerTodosPedidos();
+        return this.catalogo.obtenerTodosPedidos();
     }
     findOne(id) {
-        return this.delysService.obtenerPedido(id);
+        return this.catalogo.obtenerPedido(id);
     }
     remove(id) {
-        return this.delysService.remove(id);
+        return this.catalogo.remove(id);
     }
     usuarioActual(request) {
         if (!request.user)
@@ -73,6 +91,47 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], DelysController.prototype, "obtenerOfertas", null);
+__decorate([
+    Public(),
+    Get('secciones'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], DelysController.prototype, "obtenerSecciones", null);
+__decorate([
+    Roles('delys'),
+    Post('secciones'),
+    __param(0, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [CreateSeccionDto]),
+    __metadata("design:returntype", void 0)
+], DelysController.prototype, "crearSeccion", null);
+__decorate([
+    Roles('delys'),
+    Post('dulces'),
+    __param(0, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [CreateDulceDto]),
+    __metadata("design:returntype", void 0)
+], DelysController.prototype, "crearDulce", null);
+__decorate([
+    Roles('delys'),
+    Patch('dulces/:id'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __param(1, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, UpdateDulceDto]),
+    __metadata("design:returntype", void 0)
+], DelysController.prototype, "actualizarDulce", null);
+__decorate([
+    Roles('delys'),
+    Delete('dulces/:id'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __param(1, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], DelysController.prototype, "eliminarDulce", null);
 __decorate([
     Roles('delys'),
     Post('dulces/:id/imagen'),
@@ -102,7 +161,7 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], DelysController.prototype, "eliminarImagen", null);
 __decorate([
-    Roles('delys'),
+    Public(),
     Post('pedido'),
     __param(0, Body()),
     __metadata("design:type", Function),
@@ -134,7 +193,7 @@ __decorate([
 ], DelysController.prototype, "remove", null);
 DelysController = __decorate([
     Controller('delys'),
-    __metadata("design:paramtypes", [DelysService,
+    __metadata("design:paramtypes", [CatalogoService,
         DulceImagenService])
 ], DelysController);
 export { DelysController };

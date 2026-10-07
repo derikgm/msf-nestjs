@@ -13,13 +13,22 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/ping` | público |
 | `GET` | `/delys/dulces` | público |
 | `GET` | `/delys/ofertas` | público |
+| `GET` | `/delys/secciones` | público |
+| `POST` | `/delys/secciones` | `delys` o `admin`, **alta de sección** |
+| `GET` | `/adc/productos` | público, devuelve `productos` **y** `secciones`, sin la sección `dulces` |
+| `GET` | `/adc/secciones` | público, sin la sección `dulces` |
+| `POST` | `/adc/secciones` | `adc` o `admin`, **alta de sección** |
 | `POST` | `/auth/login` | público |
 | `POST` | `/auth/registro` | público, **solo** mientras el rol no tenga usuarios |
 | `POST` | `/auth/usuarios` | cualquier rol, crea usuarios **de ese mismo rol** |
+| `POST` | `/auth/admin/usuarios` | **solo `admin`**, crea usuarios y les asigna el rol |
 | `POST` | `/auth/cambiar-password` | cualquier rol, solo la propia contraseña |
 | `GET` | `/auth/yo` | cualquier rol |
 | `GET` | `/storage/quota` | cualquier rol, devuelve la cuota de su proyecto |
-| `POST` | `/delys/pedido` | `delys` o `admin` |
+| `POST` | `/delys/dulces` | `delys` o `admin`, **alta en el catálogo** |
+| `PATCH` | `/delys/dulces/:id` | `delys` o `admin`, **edita nombre, precio, moneda o sección** |
+| `DELETE` | `/delys/dulces/:id` | `delys` o `admin`, **borra del catálogo** |
+| `POST` | `/delys/pedido` | **público** |
 | `GET` | `/delys/pedidos` | `delys` o `admin` |
 | `GET` | `/delys/pedidos/:id` | `delys` o `admin` |
 | `DELETE` | `/delys/pedidos/:id` | `delys` o `admin` |
@@ -27,6 +36,8 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `DELETE` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
 
 `admin` es el único rol con paso libre: `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin importar el rol que pida. El resto de roles solo ven lo de su propio proyecto (ver [Decisiones.md](Decisiones.md), punto 1.3).
+
+Las rutas públicas son las que puede usar alguien sin cuenta: mirar el catálogo y **enviar un pedido**. El cliente de la pastelería no tiene credenciales, así que el alta de pedidos no lleva token. El resto de rutas de pedidos (`GET`/`DELETE`) sí lo exigen, porque son las del panel.
 
 Formato de errores, siempre el mismo:
 
@@ -141,6 +152,28 @@ Mismo cuerpo de respuesta que `/auth/registro`. Un token de `delys` no puede cre
 
 ---
 
+### 5.1. `POST /auth/admin/usuarios`
+
+Alta de plataforma: **solo un administrador** (rol `admin`) puede consumirla, y es la única forma de crear un usuario y **asignarle el rol** que quieras (cualquier proyecto o un `admin` nuevo). Requiere `Authorization: Bearer <token>`; un token de otro rol recibe `403`.
+
+| Parámetro | Tipo | Reglas |
+| --- | --- | --- |
+| `nombre` | string | obligatorio, máx. 120 |
+| `usuario` | string | obligatorio, máx. 60, único |
+| `password` | string | obligatorio, entre 8 y 200 caracteres |
+| `rol` | string | **obligatorio**, uno de `delys`, `domus`, `adc`, `admin` |
+
+```bash
+curl -X POST localhost:3000/auth/admin/usuarios \
+  -H "Authorization: Bearer eyJ..." \
+  -H 'content-type: application/json' \
+  -d '{"nombre":"Pedro","usuario":"pedro","password":"clave-de-pedro","rol":"domus"}'
+```
+
+Mismo cuerpo de respuesta que `/auth/registro`. Un `usuario` repetido da `409` y un rol que no esté en la lista da `400`.
+
+---
+
 ### 6. `POST /auth/cambiar-password`
 
 Cambia la contraseña del que llama. Requiere token.
@@ -216,12 +249,14 @@ curl localhost:3000/delys/dulces
 ```json
 {
   "dulces": [
-    { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "imagen_bytes": null }
+    { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "imagen_bytes": null, "moneda": "CUP" }
   ]
 }
 ```
 
 `imagen_url` es `null` hasta que se suba una imagen por `/delys/dulces/:id/imagen`; `imagen_bytes` es el tamaño del archivo y existe para poder devolver los bytes a la cuota al borrar.
+
+`moneda` es la moneda en la que se lee `precio`. Es **texto de hasta 8 letras y no un enum** (`varchar(8)`, por defecto `CUP`): así caben hoy `USD`, `EUR`, `MLC`… y mañana otra sin migrar nada ni tocar el servidor. Las filas que ya existían en la base se crearon todas en `CUP`.
 
 ---
 
@@ -231,14 +266,14 @@ Texto de las ofertas (sin imágenes). Sin token.
 
 ```bash
 curl localhost:3000/delys/ofertas
-# -> { "ofertas": [ { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null } ] }
+# -> { "ofertas": [ { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "moneda": "CUP" } ] }
 ```
 
 ---
 
 ### 11. `POST /delys/pedido`
 
-Crea un pedido. Requiere token con rol `delys`.
+Crea un pedido. **Ruta pública: no hace falta token.** El cliente de la pastelería no tiene cuenta, así que el pedido entra sin credenciales. Ver y borrar pedidos sí exige rol `delys` (secciones 12 a 14).
 
 **El `dulce` es solo el id.** El nombre y el precio los pone el servidor leyéndolos del catálogo: mandarlos en el body no sirve de nada (ver [Decisiones.md](Decisiones.md), punto 1.1).
 
@@ -256,7 +291,6 @@ Crea un pedido. Requiere token con rol `delys`.
 
 ```bash
 curl -X POST localhost:3000/delys/pedido \
-  -H "Authorization: Bearer eyJ..." \
   -H 'content-type: application/json' \
   -d '{
         "direccion": "Calle Reforma 222, Centro",
@@ -307,7 +341,10 @@ curl -X POST localhost:3000/delys/pedido \
 | sin `direccion` / `telefono` / `fecha` | `400` |
 | `telefono: "123"` (menos de 7) | `400` "El teléfono debe tener al menos 7 caracteres" |
 | sin `notas` | correcto, se guarda `null` |
-| Sin token | `401` |
+
+Una diferencia con el resto de la API: aquí no hay `401` ni `403` por falta de token, porque no se comprueba. Lo único que puede salir mal es el `400` de validación y el `404` de un dulce inexistente.
+
+**Pendiente:** esta ruta acepta peticiones de cualquiera, sin límite. Cuando se conecte `@nestjs/throttler` hay que decidir el tope (por IP y/o por `telefono`) antes de abrirla al público de verdad.
 
 ---
 
@@ -437,6 +474,168 @@ curl -X DELETE localhost:3000/delys/dulces/1/imagen -H "Authorization: Bearer ey
 ```
 
 El dulce sigue en el catálogo; solo pierde la foto. Es la forma de devolver los bytes a la cuota.
+
+---
+
+### 17. `POST /delys/dulces`
+
+Alta de un dulce en el catálogo, desde el panel de la pastelería. Requiere token `delys`.
+
+**El `id` no se manda: lo asigna el servidor** (el siguiente libre, `MAX(id) + 1`). La tabla `dulce` usa el id como clave primaria sin autogenerar y la sembró `data/ofertas.ts` con ids a mano, así que aceptarlo del cliente dejaría pisar dulces existentes.
+
+| Parámetro | Tipo | Reglas |
+| --- | --- | --- |
+| `nombre` | string | obligatorio, no vacío, máx. 120 |
+| `precio` | number | obligatorio, 0 o mayor, hasta 2 decimales |
+| `moneda` | string | opcional, máx. 8 letras; sin ella nace en `CUP` |
+
+```bash
+curl -X POST localhost:3000/delys/dulces \
+  -H "Authorization: Bearer eyJ..." \
+  -H 'content-type: application/json' \
+  -d '{"nombre":"Concha de chocolate","precio":1800,"moneda":"USD"}'
+```
+
+```json
+{
+  "mensaje": "Dulce creado correctamente",
+  "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 1800, "imagen_url": null, "imagen_bytes": null, "moneda": "USD" }
+}
+```
+
+El dulce nace sin imagen: se sube aparte con la sección 15.
+
+| Situación | Respuesta |
+| --- | --- |
+| Sin token | `401` |
+| Token de otro proyecto | `403` |
+| `"nombre": ""` | `400` |
+| `"precio": -5` | `400` |
+| `"precio": "mucho"` | `400` |
+| `"moneda": "SUPERLARGA"` (más de 8 letras) | `400` |
+| sin `"moneda"` | correcto: nace en `CUP` |
+| mandar `"id": 1` | se ignora: el id lo pone el servidor (`whitelist: true`) |
+| mandar `"imagen_url": "..."` | se ignora |
+
+El alta va en transacción. Dos altas simultáneas calcularían el mismo id y la restricción de clave primaria hace que una gane y la otra reciba un error de duplicado.
+
+---
+
+### 18. `PATCH /delys/dulces/:id`
+
+Edita un dulce. Requiere token `delys`. Se manda **solo lo que cambia**.
+
+| Parámetro | Dónde | Tipo | Reglas |
+| --- | --- | --- | --- |
+| `id` | path | number | entero |
+| `nombre` | body | string | opcional, no vacío, máx. 120 |
+| `precio` | body | number | opcional, 0 o mayor, hasta 2 decimales |
+| `moneda` | body | string | opcional, máx. 8 letras; si no se manda, no se toca |
+
+```bash
+curl -X PATCH localhost:3000/delys/dulces/12 \
+  -H "Authorization: Bearer eyJ..." \
+  -H 'content-type: application/json' \
+  -d '{"precio":2100,"moneda":"eur"}'
+```
+
+```json
+{ "mensaje": "Dulce actualizado correctamente", "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 2100, "imagen_url": null, "imagen_bytes": null, "moneda": "EUR" } }
+```
+
+| Situación | Respuesta |
+| --- | --- |
+| Cuerpo `{}` o sin los tres campos | `400` "No hay nada que actualizar: manda \"nombre\", \"precio\" o \"moneda\"" |
+| `id` inexistente | `404` "No existe el dulce 99" |
+| mandar los tres campos | correcto: cambian los tres |
+| mandar `"moneda": " eur "` | correcto: queda `EUR` (se normaliza a mayúsculas) |
+| mandar `"imagen_url"` | se ignora: la imagen va por su propia ruta |
+
+---
+
+### 19. `DELETE /delys/dulces/:id`
+
+Borra el dulce del catálogo. Requiere token `delys`. Mismo parámetro `id` entero.
+
+```bash
+curl -X DELETE localhost:3000/delys/dulces/12 -H "Authorization: Bearer eyJ..."
+# -> { "ok": true }
+```
+
+**Antes de borrar la fila libera su imagen**: si el dulce tenía foto, el archivo sale de Supabase Storage y sus bytes vuelven a la cuota del rol. Así no quedan archivos huérfanos ocupando espacio (ver TODO.md, "Cuota de Storage").
+
+**Un dulce que está en un pedido sin resolver no se puede borrar.** El renglón de un encargo forma parte del pedido y `pedido.precio_total` está guardado, no se recalcula: borrarlo dejaría al pedido con un total que no cuadra con sus renglones y sin forma de saber qué se había pedido. Por eso `encargo.dulce_id` es `ON DELETE RESTRICT` y el servicio cuenta los pedidos abiertos antes de borrar.
+
+| Situación | Respuesta |
+| --- | --- |
+| `id` inexistente | `404` |
+| dulce en 1 pedido sin resolver | `409`: `"Charolas surtida" está en 1 pedido sin resolver. Márcalo como hecho o cancélalo en Pedidos, y ya lo podrás borrar.` |
+| dulce en varios pedidos sin resolver | `409`, con el número de pedidos: `"..." está en 3 pedidos sin resolver. ...` |
+| dulce sin imagen | correcto: no hay nada que liberar |
+| Storage sin credenciales o caído | el dulce **se borra igual** y se registra un `warn`; el archivo huérfano queda pendiente de limpiar a mano |
+| no se pudo contar los pedidos | `503`: no se borra. Ante la duda se bloquea: perder un pedido es peor que dejar un dulce en el catálogo |
+
+Un dulce se puede borrar siempre que sus pedidos estén resueltos: al resolver un pedido (hecho o cancelado) sus encargos se van en cascada con él y el dulce queda libre.
+
+---
+
+### 20. Secciones del catálogo
+
+El catálogo se navega por secciones (tabla `seccion`), y cada producto pertenece a una (`producto.seccion_id`). La sección **`dulces`** es la especial del catálogo heredado: los productos que existían antes de las secciones se migran ahí. La pastelería la muestra con normalidad (es donde vive todo su catálogo); **ADC la esconde** porque es el catálogo ajeno.
+
+Los nombres se guardan en minúsculas (`Electronico` pasa a `electronico`) y deben ser únicos dentro de cada negocio.
+
+#### 20.1. `GET /delys/secciones` y `GET /adc/secciones`
+
+Públicas. Devuelven las secciones del negocio, en orden de creación, **sin** la sección `dulces` en el caso de ADC:
+
+```bash
+curl localhost:3000/delys/secciones
+# -> { "secciones": [ { "id": 2, "nombre": "dulces" } ] }
+curl localhost:3000/adc/secciones
+# -> { "secciones": [ { "id": 4, "nombre": "electronico" } ] }
+```
+
+#### 20.2. `POST /delys/secciones` y `POST /adc/secciones`
+
+Alta desde el panel, con token del negocio (o `admin`, que entra a todo):
+
+```bash
+curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" -d '{"nombre":"Electronico"}'
+# -> { "mensaje": "Sección creada correctamente", "seccion": { "id": 5, "nombre": "electronico", ... } }
+```
+
+| Situación | Respuesta |
+| --- | --- |
+| `nombre` vacío o de más de 60 letras | `400` |
+| sección repetida en el mismo negocio | `409`: `La sección "electronico" ya existe` |
+| sin token / rol equivocado | `401` / `403` |
+
+#### 20.3. Sección de un producto (`seccion_id`)
+
+`POST /delys/dulces`, `PATCH /delys/dulces/:id` (y sus equivalentes `/adc/productos`) aceptan `seccion_id` opcional. Sin él, el producto cae en la sección `dulces` de su negocio (la que cobija lo heredado):
+
+| Situación | Respuesta |
+| --- | --- |
+| `seccion_id` de una sección de **otro negocio** | `404`: `No existe la sección 1` |
+| producto sin `seccion_id` al crearse | se asigna a `dulces` de su negocio |
+| mover un producto con `PATCH` | `PATCH` con `{"seccion_id": 5}`; no hay forma de dejarlo "sin sección", lo más parecido es la propia `dulces` |
+
+#### 20.4. `GET /adc/productos`
+
+Devuelve **productos y secciones**, y excluye la sección `dulces` (ni la lista ni los productos que viven en ella):
+
+```bash
+curl localhost:3000/adc/productos
+# -> {
+#      "productos": [ { "id": 7, "nombre": "Inversor 1500W", "precio": 18500, "moneda": "CUP",
+#                       "imagen_url": null, "seccion_id": 4, "seccion": "electronico" } ],
+#      "secciones": [ { "id": 4, "nombre": "electronico" } ]
+#    }
+```
+
+`/delys/dulces` no cambia de forma: sigue devolviendo los dulces con su `seccion_id` y su objeto `seccion` encima.
 
 ---
 

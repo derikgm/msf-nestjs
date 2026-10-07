@@ -6,6 +6,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 import { Module } from '@nestjs/common';
 import { DelysModule } from './delys/delys.module.js';
+import { AdcModule } from './adc/adc.module.js';
 import { ControlModule } from './control/control.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { StorageQuotaModule } from './common/modules/storage-quota/storage-quota.module.js';
@@ -27,14 +28,15 @@ AppModule = __decorate([
                     url: configService.get('DATABASE_URL'),
                     autoLoadEntities: true,
                     synchronize: true,
-                    ssl: {
-                        rejectUnauthorized: false,
-                    },
+                    ssl: configService.get('DB_SSL') === 'false'
+                        ? false
+                        : { rejectUnauthorized: false },
                     connectTimeoutMS: 30000,
                     uuidExtension: 'pgcrypto',
                 }),
             }),
             DelysModule,
+            AdcModule,
             ControlModule,
             AuthModule,
             StorageQuotaModule,

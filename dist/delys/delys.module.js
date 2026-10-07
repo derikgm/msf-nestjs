@@ -6,10 +6,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DelysService } from './delys.service.js';
-import { DulceImagenService } from './dulce-imagen.service.js';
 import { DelysController } from './delys.controller.js';
-import { entities } from './entities/index.js';
+import { CatalogoService } from '../common/services/catalogo.service.js';
+import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
+import { entities } from '../common/entities/index.js';
+import { CONFIG_DELYS, NEGOCIO } from '../common/config/negocio.config.js';
 import { StorageQuotaModule } from '../common/modules/storage-quota/storage-quota.module.js';
 import { SupabaseModule } from '../common/modules/supabase/supabase.module.js';
 let DelysModule = class DelysModule {
@@ -18,7 +19,11 @@ DelysModule = __decorate([
     Module({
         imports: [TypeOrmModule.forFeature(entities), StorageQuotaModule, SupabaseModule],
         controllers: [DelysController],
-        providers: [DelysService, DulceImagenService],
+        providers: [
+            { provide: NEGOCIO, useValue: CONFIG_DELYS },
+            CatalogoService,
+            DulceImagenService,
+        ],
     })
 ], DelysModule);
 export { DelysModule };

@@ -130,7 +130,17 @@ Con las columnas permeables el `synchronize` las añade y arranca siempre, y los
 
 ---
 
-### 1.7 Cosas que también hay que hacer antes de producción
+### 1.7 Un dulce en un pedido sin resolver no se puede borrar
+
+**Decisión.** `encargo.dulce_id` pasa de `ON DELETE CASCADE` a `ON DELETE RESTRICT`, y `DelysService.eliminarDulce()` cuenta los pedidos abiertos del dulce y responde `409` si hay alguno.
+
+**Por qué.** El `CASCADE` estaba puesto cuando nadie podía borrar dulces, así que era inofensivo: no existía ninguna ruta que lo disparara. Al añadir `DELETE /delys/dulces/:id` se volvió reachable y con consecuencias. Borrar un dulce arrastraba los renglones de todos los pedidos que lo habían pedido, y como `pedido.precio_total` es una columna guardada y no se recalcula, el pedido quedaba con su total y sin los renglones que lo componen. Comprobado contra el servidor local: un pedido de $3,500 por un dulce quedó en `precio_total: 3500` y `encargos: []`.
+
+Las dos opciones para no perder el renglón eran desvincular y guardar una copia del nombre y el precio del momento de pedirlo (dos columnas más, y `GET /delys/pedidos` deja de garantizar que cada encargo trae su dulce), o negarse a borrar. Se eligió negarse: el catálogo es pequeño y editable, los pedidos se resuelven el mismo día, y mientras tanto no se pierde nada ni se descuadra ningún total. `encargo.pedido_id` sigue en `CASCADE`, porque al resolver un pedido sus encargos sí deben irse con él.
+
+**Lo que queda por hacer.** Si alguna vez hace falta borrar un dulce que sí está en pedidos, la migración es `SET NULL` + snapshot de `nombre` y `precio` en `encargo`, y `delys.interfaces.ts` y los clientes se adaptan al `dulce` nulo.
+
+### 1.8 Cosas que también hay que hacer antes de producción
 
 No son decisiones, solo recordatorios que quedaron sueltos:
 
@@ -139,4 +149,4 @@ No son decisiones, solo recordatorios que quedaron sueltos:
 * La tabla `storage_quota` se crea sola con `synchronize: true`. Cuando eso se desactive hay que generar la migración de `usuario`, `storage_quota`, las columnas `dulce.imagen_bytes` / `dulce.imagen_url` y las cuatro columnas de entrega de `pedido` (ver 1.6 para volverlas NOT NULL).
 * `StorageQuotaService.decrementarUso()` sigue haciendo leer-y-escribir: dos borrados de imagen a la vez pueden pisarse y la cuota queda desviada. `reservarCuota()` sí está protegido con un `UPDATE` condicional. Cuando se toque eso, `decrementarUso()` debería hacer `SET bytes_usados = GREATEST(bytes_usados - n, 0)` en una sola sentencia.
 * El frontend Delys vive clonado en `frontends/delys` (ignorado por git). Se trabaja en su rama `develop_complex`. El contrato con la API se verificó pasando el payload real del frontend por el `ValidationPipe` del backend: encaja. Conviene repetir esa comprobación cuando se toque cualquiera de los dos lados, porque en `develop_complex` el campo se llamaba `dulce_id` y el backend pide `dulce`; con `whitelist: true` el nombre equivocado se descarta en silencio y el pedido falla con un 400.
-* `DelysService.onApplicationBootstrap()` comprueba `count()` y luego inserta. Con dos instancias arrancando a la vez, las dos ven la tabla vacía e insertan el catálogo duplicado. Se arregla con `INSERT ... ON CONFLICT DO NOTHING`.
+* `CatalogoService.onApplicationBootstrap()` comprueba `count()` y luego inserta. Con dos instancias arrancando a la vez, las dos ven la tabla vacía e insertan el catálogo duplicado. Se arregla con `INSERT ... ON CONFLICT DO NOTHING`.

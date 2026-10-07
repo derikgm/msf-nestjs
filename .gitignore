@@ -1,7 +1,13 @@
 node_modules/
 package-lock.json
 .env
+
+# Caché incremental de tsc. Son dos nombres distintos: "tsbuildinfo" lo escribe
+# tsconfig.build.json (tsBuildInfoFile) y "tsconfig.tsbuildinfo" el tsconfig raíz,
+# que es el que compila el editor. Antes solo estaba el primero, y el segundo
+# (272 KB) se colaba al repo como untracked.
 tsbuildinfo
+*.tsbuildinfo
 
 # Clientes de la API (Delys, Domus...). Cada uno es su propio repo, se clonan
 # dentro de esta carpeta y no se versionan aquí.
@@ -13,3 +19,5 @@ tsbuildinfo
 # pero ningún frontend entra al repo.
 frontends/**
 !frontends/README.md
+# Respaldo de la base de datos (contiene hashes de contraseñas): nunca se sube.
+respaldo/

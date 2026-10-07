@@ -32,15 +32,20 @@ Cada token lleva un **rol** y hay dos guards: el de autenticación (firma + que 
 
 | Ruta | Rol |
 | --- | --- |
-| `GET /ping`, `GET /delys/dulces`, `GET /delys/ofertas`, `POST /auth/login` | público |
+| `GET /ping`, `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /adc/productos`, `GET /adc/secciones`, `POST /auth/login` | público |
 | `POST /auth/registro` | público **solo** mientras el rol no tenga ningún usuario |
-| `POST /delys/pedido`, `GET /delys/pedidos`, `GET /delys/pedidos/:id`, `DELETE /delys/pedidos/:id` | `delys` |
+| `POST /delys/pedido` | **público** (el cliente no tiene cuenta) |
+| `GET /delys/pedidos`, `GET /delys/pedidos/:id`, `DELETE /delys/pedidos/:id` | `delys` |
 | `POST /delys/dulces/:id/imagen`, `DELETE /delys/dulces/:id/imagen` | `delys` |
+| `POST /delys/secciones`, `POST /adc/secciones` | `delys` / `adc` (secciones del panel) |
 | `POST /auth/usuarios`, `POST /auth/cambiar-password`, `GET /auth/yo`, `GET /storage/quota` | el que sea |
+| `POST /auth/admin/usuarios` | **solo `admin`**, crea usuarios y les asigna el rol |
 
 ### El modelo de usuarios
 
 El rol **es** el proyecto: `delys`, `domus`. No hay un superusuario que vea los dos; cada usuario solo ve lo de su proyecto. La excepción es `admin`: administra la plataforma y `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin tocar los decoradores uno por uno. El aislamiento entre `delys` y `domus` no se toca.
+
+`admin` es además el único que puede **asignar el rol** al crear un usuario: `POST /auth/admin/usuarios` recibe `rol` en el cuerpo (en `POST /auth/usuarios` ese campo se ignora, el rol sale del token).
 
 `POST /auth/registro` está abierto mientras el rol esté vacío, que es el arranque de cada proyecto: el primer usuario se registra solo y a partir de ahí el registro se cierra. Para meter más gente en ese proyecto hay que estar autenticado con `@Roles` de ese mismo rol:
 

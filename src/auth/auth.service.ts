@@ -1,12 +1,19 @@
-import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
+import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto.js';
 import { LoginDto } from './dto/login.dto.js';
-import { Usuario, type RolUsuario } from './entities/index.js';
+import { ROL_SUPERUSUARIO, Usuario, type RolUsuario } from './entities/index.js';
 import { AuthUser } from './auth.interfaces.js';
 import { HASH_FICTICIO, hashPassword, verifyPassword } from './password.util.js';
 import { parseDurationToSeconds } from '../common/utils/duration.util.js';
@@ -72,6 +79,22 @@ export class AuthService {
   /** Crea un usuario dentro del propio rol del que llama. */
   async crearUsuario(dto: CreateUsuarioDto, caller: AuthUser) {
     return this.crear(dto, caller.rol);
+  }
+
+  /**
+   * Alta que solo puede hacer un administrador: el rol se manda en el cuerpo y
+   * no sale del token.
+   *
+   * `RolesGuard` ya restringe la ruta a `admin` (`@Roles(ROL_SUPERUSUARIO)`); la
+   * comprobación de aquí es por si este método se expone sin el guard: crear
+   * usuarios de un proyecto ajeno es justo lo que el aislamiento de roles evita.
+   */
+  async crearUsuarioAdmin(dto: CreateUsuarioAdminDto, caller: AuthUser) {
+    if (caller.rol !== ROL_SUPERUSUARIO) {
+      throw new ForbiddenException('Solo un administrador puede asignar roles');
+    }
+
+    return this.crear(dto, dto.rol);
   }
 
   /** Cada usuario cambia su propia contraseña. */

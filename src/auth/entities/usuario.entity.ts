@@ -14,7 +14,7 @@ import {
  * "admin" es la excepción: administra la plataforma y entra a cualquier ruta con
  * `@Roles()` (ver RolesGuard). El resto de roles solo ven lo de su propio proyecto.
  */
-export const ROLES = ['delys', 'domus', 'admin'] as const;
+export const ROLES = ['delys', 'domus', 'adc', 'admin'] as const;
 
 export type RolUsuario = (typeof ROLES)[number];
 

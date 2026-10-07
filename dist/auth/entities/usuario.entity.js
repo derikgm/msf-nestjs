@@ -8,7 +8,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, } from 'typeorm';
-export const ROLES = ['delys', 'domus', 'admin'];
+export const ROLES = ['delys', 'domus', 'adc', 'admin'];
 export const ROL_SUPERUSUARIO = 'admin';
 let Usuario = class Usuario {
     id;
