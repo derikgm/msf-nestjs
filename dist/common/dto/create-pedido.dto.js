@@ -8,7 +8,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, MaxLength, Min, MinLength, ValidateNested, ArrayMinSize, } from 'class-validator';
+import { IsArray, IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, Max, MaxLength, Min, MinLength, ValidateNested, ArrayMaxSize, ArrayMinSize, } from 'class-validator';
 import { IsFechaDeEntrega } from '../utils/fecha.util.js';
 export class CreateEncargoDto {
     dulce;
@@ -22,6 +22,7 @@ __decorate([
 __decorate([
     IsInt(),
     Min(1),
+    Max(999),
     __metadata("design:type", Number)
 ], CreateEncargoDto.prototype, "cantidad", void 0);
 export class CreatePedidoDto {
@@ -57,6 +58,7 @@ __decorate([
 __decorate([
     IsArray(),
     ArrayMinSize(1),
+    ArrayMaxSize(50),
     ValidateNested({ each: true }),
     Type(() => CreateEncargoDto),
     __metadata("design:type", Array)

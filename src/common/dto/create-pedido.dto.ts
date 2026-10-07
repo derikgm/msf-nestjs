@@ -6,10 +6,12 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
   ValidateNested,
+  ArrayMaxSize,
   ArrayMinSize,
 } from 'class-validator';
 import { IsFechaDeEntrega } from '../utils/fecha.util.js';
@@ -24,8 +26,13 @@ export class CreateEncargoDto {
   @IsPositive()
   dulce: number;
 
+  /**
+   * `numeric(12,2)`: sin cota, un `cantidad: 10**12` desbordaba la columna y el
+   * error salía como 500 desde una ruta pública (N-11).
+   */
   @IsInt()
   @Min(1)
+  @Max(999)
   cantidad: number;
 }
 
@@ -57,8 +64,14 @@ export class CreatePedidoDto {
   @MaxLength(1000)
   notas?: string;
 
+  /**
+   * Máximo de renglones por pedido: en `POST /delys/pedido` (ruta pública) un
+   * body con miles de encargos obligaba al servidor a procesarlo entero antes
+   * de fallar (N-11). El límite es generoso de sobra para un pedido real.
+   */
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => CreateEncargoDto)
   encargos: CreateEncargoDto[];
