@@ -21,6 +21,7 @@ import { DulceImagenService } from './dulce-imagen.service.js';
 const relations = {
     encargos: { dulce: true },
 };
+const SECCION_RESERVADA = 'dulces';
 let CatalogoService = CatalogoService_1 = class CatalogoService {
     config;
     pedidoRepo;
@@ -82,11 +83,52 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
     }
     async crearSeccion(nombre) {
         const limpio = nombre.trim().toLowerCase();
+        this.comprobarNombreDeSeccion(limpio);
         if (await this.seccionRepo.existsBy({ negocio: this.config.clave, nombre: limpio })) {
             throw new ConflictException(`La sección "${limpio}" ya existe`);
         }
         const guardada = await this.seccionRepo.save(this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio }));
         return { mensaje: 'Sección creada correctamente', seccion: guardada };
+    }
+    async actualizarSeccion(id, nombre) {
+        const limpio = nombre.trim().toLowerCase();
+        this.comprobarNombreDeSeccion(limpio);
+        const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
+        if (!seccion)
+            throw new NotFoundException(`No existe la sección ${id}`);
+        const repetida = await this.seccionRepo.findOneBy({
+            negocio: this.config.clave,
+            nombre: limpio,
+        });
+        if (repetida && repetida.id !== id) {
+            throw new ConflictException(`La sección "${limpio}" ya existe`);
+        }
+        seccion.nombre = limpio;
+        const guardada = await this.seccionRepo.save(seccion);
+        return { mensaje: 'Sección actualizada correctamente', seccion: guardada };
+    }
+    async eliminarSeccion(id) {
+        const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
+        if (!seccion)
+            throw new NotFoundException(`No existe la sección ${id}`);
+        if (seccion.nombre === SECCION_RESERVADA) {
+            throw new BadRequestException(`La sección "${SECCION_RESERVADA}" es la de reserva: no se puede borrar`);
+        }
+        const productos = await this.dulceRepo.count({ where: { seccion_id: id } });
+        if (productos > 0) {
+            throw new ConflictException(`La sección "${seccion.nombre}" tiene ${productos} ${this.config.articulo}` +
+                `${productos === 1 ? '' : 's'}: móvelos a otra sección antes de borrarla`);
+        }
+        await this.seccionRepo.remove(seccion);
+        return { ok: true };
+    }
+    comprobarNombreDeSeccion(nombre) {
+        if (!nombre) {
+            throw new BadRequestException('El nombre de la sección no puede estar vacío');
+        }
+        if (nombre === SECCION_RESERVADA) {
+            throw new BadRequestException(`"${SECCION_RESERVADA}" es la sección reservada del catálogo heredado: elige otro nombre`);
+        }
     }
     async crearPedido(createPedidoDto) {
         const { encargos: encargosDto } = createPedidoDto;

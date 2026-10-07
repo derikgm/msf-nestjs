@@ -32,9 +32,8 @@ let AdcController = class AdcController {
     async obtenerProductos() {
         const { dulces } = await this.catalogo.obtenerTodosDulces();
         const { secciones } = await this.catalogo.listarSecciones();
-        const visibles = dulces.filter((dulce) => dulce.seccion?.nombre !== 'dulces');
         return {
-            productos: visibles.map((dulce) => ({
+            productos: dulces.map((dulce) => ({
                 id: dulce.id,
                 nombre: dulce.nombre,
                 precio: dulce.precio,
@@ -43,21 +42,23 @@ let AdcController = class AdcController {
                 seccion_id: dulce.seccion?.id ?? null,
                 seccion: dulce.seccion?.nombre ?? null,
             })),
-            secciones: secciones
-                .filter((seccion) => seccion.nombre !== 'dulces')
-                .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+            secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
         };
     }
     async obtenerSecciones() {
         const { secciones } = await this.catalogo.listarSecciones();
         return {
-            secciones: secciones
-                .filter((seccion) => seccion.nombre !== 'dulces')
-                .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+            secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
         };
     }
     crearSeccion(createSeccionDto) {
         return this.catalogo.crearSeccion(createSeccionDto.nombre);
+    }
+    actualizarSeccion(id, createSeccionDto) {
+        return this.catalogo.actualizarSeccion(id, createSeccionDto.nombre);
+    }
+    eliminarSeccion(id) {
+        return this.catalogo.eliminarSeccion(id);
     }
     async crearProducto(createDulceDto) {
         const { mensaje, dulce } = await this.catalogo.crearDulce(createDulceDto);
@@ -70,14 +71,16 @@ let AdcController = class AdcController {
     eliminarProducto(id, request) {
         return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
     }
-    subirImagen(id, file, request) {
+    async subirImagen(id, file, request) {
         if (!file) {
             throw new BadRequestException('Falta el archivo. Envíalo como multipart/form-data en el campo "imagen"');
         }
-        return this.imagenService.subir(id, file, this.usuarioActual(request));
+        const { mensaje, dulce, cuota } = await this.imagenService.subir(id, file, this.usuarioActual(request));
+        return { mensaje, producto: dulce, cuota };
     }
-    eliminarImagen(id, request) {
-        return this.imagenService.eliminar(id, this.usuarioActual(request));
+    async eliminarImagen(id, request) {
+        const { mensaje, dulce, cuota } = await this.imagenService.eliminar(id, this.usuarioActual(request));
+        return { mensaje, producto: dulce, cuota };
     }
     agregarPedido(createPedidoDto) {
         return this.catalogo.crearPedido(createPedidoDto);
@@ -121,6 +124,23 @@ __decorate([
 ], AdcController.prototype, "crearSeccion", null);
 __decorate([
     Roles('adc'),
+    Patch('secciones/:id'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __param(1, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, CreateSeccionDto]),
+    __metadata("design:returntype", void 0)
+], AdcController.prototype, "actualizarSeccion", null);
+__decorate([
+    Roles('adc'),
+    Delete('secciones/:id'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], AdcController.prototype, "eliminarSeccion", null);
+__decorate([
+    Roles('adc'),
     Post('productos'),
     __param(0, Body()),
     __metadata("design:type", Function),
@@ -162,7 +182,7 @@ __decorate([
     __param(2, Req()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Object, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], AdcController.prototype, "subirImagen", null);
 __decorate([
     Roles('adc'),
@@ -171,7 +191,7 @@ __decorate([
     __param(1, Req()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], AdcController.prototype, "eliminarImagen", null);
 __decorate([
     Public(),

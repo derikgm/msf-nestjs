@@ -54,20 +54,22 @@ export class AdcController {
   ) {}
 
   // Catálogo: público, sin token, igual que la vitrina de Delys. Devuelve los
-  // productos y sus secciones de navegación, **exceptuando la sección "dulces"**:
-  // esa es la sección especial del catálogo heredado (los dulces de la
-  // pastelería), así que ADC ni la lista ni devuelve los productos que viven en
-  // ella. El resto del catálogo sí, compuesto por sus secciones y productos.
+  // productos y sus secciones de navegación **tal cual están en este negocio**.
+  //
+  // Antes se quitaba de la respuesta todo lo llamado "dulces" (la sección del
+  // catálogo heredado), pero la separación entre negocios es la columna
+  // `negocio` y `obtenerTodosDulces()` ya filtra por la de ADC: ese filtro solo
+  // conseguía esconder productos legítimos de ADC, los que se dan de alta sin
+  // sección y acaban en esa sección por defecto (punto 2: con 4 creados solo se
+  // veían 3). Ahora salen todos, y el panel permite reubicarlos.
   @Public()
   @Get('productos')
   async obtenerProductos() {
     const { dulces } = await this.catalogo.obtenerTodosDulces();
     const { secciones } = await this.catalogo.listarSecciones();
 
-    const visibles = dulces.filter((dulce) => dulce.seccion?.nombre !== 'dulces');
-
     return {
-      productos: visibles.map((dulce) => ({
+      productos: dulces.map((dulce) => ({
         id: dulce.id,
         nombre: dulce.nombre,
         precio: dulce.precio,
@@ -76,22 +78,18 @@ export class AdcController {
         seccion_id: dulce.seccion?.id ?? null,
         seccion: dulce.seccion?.nombre ?? null,
       })),
-      secciones: secciones
-        .filter((seccion) => seccion.nombre !== 'dulces')
-        .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+      secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
     };
   }
 
-  // Secciones de ADC: lectura pública para la vitrina y alta desde el panel.
+  // Secciones de ADC: lectura pública para la vitrina y gestión desde el panel.
   @Public()
   @Get('secciones')
   async obtenerSecciones() {
     const { secciones } = await this.catalogo.listarSecciones();
 
     return {
-      secciones: secciones
-        .filter((seccion) => seccion.nombre !== 'dulces')
-        .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+      secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
     };
   }
 
@@ -99,6 +97,25 @@ export class AdcController {
   @Post('secciones')
   crearSeccion(@Body() createSeccionDto: CreateSeccionDto) {
     return this.catalogo.crearSeccion(createSeccionDto.nombre);
+  }
+
+  // Renombrar y borrar secciones (punto 2). El cuerpo del `PATCH` es la misma
+  // forma que el alta —solo manda el nombre—, así que se reutiliza el DTO.
+  // Borrar una sección con productos devuelve `409` con el número de ellos en
+  // vez de moverlos a escondidas (ver `CatalogoService.eliminarSeccion()`).
+  @Roles('adc')
+  @Patch('secciones/:id')
+  actualizarSeccion(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Body() createSeccionDto: CreateSeccionDto,
+  ) {
+    return this.catalogo.actualizarSeccion(id, createSeccionDto.nombre);
+  }
+
+  @Roles('adc')
+  @Delete('secciones/:id')
+  eliminarSeccion(@Param('id', new ParseIntPipe()) id: number) {
+    return this.catalogo.eliminarSeccion(id);
   }
 
   // Gestión del catálogo desde el panel de ADC. El id lo asigna el servidor,
@@ -153,7 +170,7 @@ export class AdcController {
       },
     }),
   )
-  subirImagen(
+  async subirImagen(
     @Param('id', new ParseIntPipe()) id: number,
     @UploadedFile() file: MulterFile | undefined,
     @Req() request: RequestConUsuario,
@@ -164,16 +181,30 @@ export class AdcController {
       );
     }
 
-    return this.imagenService.subir(id, file, this.usuarioActual(request));
+    const { mensaje, dulce, cuota } = await this.imagenService.subir(
+      id,
+      file,
+      this.usuarioActual(request),
+    );
+
+    // El servicio se llama `dulce` por Delys; aquí se traduce como en el resto
+    // de las rutas de ADC (ver la cabecera de la clase). Sin esto el panel
+    // leía `producto` y recibía `undefined`.
+    return { mensaje, producto: dulce, cuota };
   }
 
   @Roles('adc')
   @Delete('productos/:id/imagen')
-  eliminarImagen(
+  async eliminarImagen(
     @Param('id', new ParseIntPipe()) id: number,
     @Req() request: RequestConUsuario,
   ) {
-    return this.imagenService.eliminar(id, this.usuarioActual(request));
+    const { mensaje, dulce, cuota } = await this.imagenService.eliminar(
+      id,
+      this.usuarioActual(request),
+    );
+
+    return { mensaje, producto: dulce, cuota };
   }
 
   // Alta de pedidos: pública, por la misma razón que en Delys (el cliente no

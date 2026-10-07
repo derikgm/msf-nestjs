@@ -7,11 +7,13 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Injectable } from '@nestjs/common';
+var SupabaseService_1;
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { crearSupabaseClient } from '../providers/supabase.provider.js';
-let SupabaseService = class SupabaseService {
+let SupabaseService = SupabaseService_1 = class SupabaseService {
     config;
+    logger = new Logger(SupabaseService_1.name);
     cliente;
     constructor(config) {
         this.config = config;
@@ -20,21 +22,29 @@ let SupabaseService = class SupabaseService {
         return (this.cliente ??= crearSupabaseClient(this.config));
     }
     async subir(bucket, path, contenido, contentType) {
-        const { error } = await this.getClient()
-            .storage.from(bucket)
-            .upload(path, contenido, { contentType, upsert: false });
-        if (error) {
-            throw new Error(`Supabase Storage rechazó la subida: ${error.message}`);
+        const error = await this.probarSubida(bucket, path, contenido, contentType);
+        if (!error)
+            return path;
+        if (this.faltaElBucket(error.message)) {
+            await this.asegurarBucket(bucket);
+            const reintento = await this.probarSubida(bucket, path, contenido, contentType);
+            if (!reintento)
+                return path;
+            throw this.falloDeStorage('subir la imagen', reintento.message);
         }
-        return path;
+        throw this.falloDeStorage('subir la imagen', error.message);
     }
     async eliminar(bucket, paths) {
         if (!paths.length)
             return;
         const { error } = await this.getClient().storage.from(bucket).remove(paths);
-        if (error) {
-            throw new Error(`Supabase Storage no pudo borrar: ${error.message}`);
+        if (!error)
+            return;
+        if (this.faltaElBucket(error.message)) {
+            this.logger.warn(`El bucket «${bucket}» no existe: no hay nada que borrar.`);
+            return;
         }
+        throw this.falloDeStorage('borrar la imagen', error.message);
     }
     getPublicUrl(bucket, path) {
         return this.getClient().storage.from(bucket).getPublicUrl(path).data.publicUrl;
@@ -46,8 +56,29 @@ let SupabaseService = class SupabaseService {
             return undefined;
         return decodeURIComponent(url.slice(indice + marca.length));
     }
+    async probarSubida(bucket, path, contenido, contentType) {
+        const { error } = await this.getClient()
+            .storage.from(bucket)
+            .upload(path, contenido, { contentType, upsert: false });
+        return error ?? null;
+    }
+    async asegurarBucket(bucket) {
+        const { error } = await this.getClient().storage.createBucket(bucket, {
+            public: true,
+        });
+        if (error && !/already exists|duplicate/i.test(error.message)) {
+            throw this.falloDeStorage(`crear el bucket «${bucket}»`, error.message);
+        }
+        this.logger.log(`Creado el bucket «${bucket}» de Storage (faltaba).`);
+    }
+    faltaElBucket(motivo) {
+        return /bucket\s+(not found|does not exist)|not found.*bucket/i.test(motivo);
+    }
+    falloDeStorage(accion, motivo) {
+        return new InternalServerErrorException(`Supabase Storage no pudo ${accion}: ${motivo}`);
+    }
 };
-SupabaseService = __decorate([
+SupabaseService = SupabaseService_1 = __decorate([
     Injectable(),
     __metadata("design:paramtypes", [ConfigService])
 ], SupabaseService);

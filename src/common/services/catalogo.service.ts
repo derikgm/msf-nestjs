@@ -25,6 +25,14 @@ const relations = {
 } satisfies FindOptionsRelations<Pedido>;
 
 /**
+ * La sección en la que acaba un producto que se da de alta sin `seccion_id`
+ * (`seccionDulces()`). Reservada para el panel: el `AdcController` la oculta de
+ * sus respuestas, así que una sección real llamada "dulces" quedaría fuera de
+ * la tienda de ADC — no se puede crear ni renombrar a ese nombre.
+ */
+const SECCION_RESERVADA = 'dulces';
+
+/**
  * Servicio del catálogo, **de cualquier negocio** (Delys, ADC…).
  *
  * La misma clase se monta una vez por negocio, cada una con su configuración
@@ -151,6 +159,7 @@ export class CatalogoService implements OnApplicationBootstrap {
    */
   async crearSeccion(nombre: string) {
     const limpio = nombre.trim().toLowerCase();
+    this.comprobarNombreDeSeccion(limpio);
 
     if (await this.seccionRepo.existsBy({ negocio: this.config.clave, nombre: limpio })) {
       throw new ConflictException(`La sección "${limpio}" ya existe`);
@@ -161,6 +170,89 @@ export class CatalogoService implements OnApplicationBootstrap {
     );
 
     return { mensaje: 'Sección creada correctamente', seccion: guardada };
+  }
+
+  /**
+   * Cambia el nombre de una sección de este negocio (punto 2 del todo).
+   *
+   * Baja a minúsculas igual que en el alta, para que "Electronico" y
+   * "electronico" no acaben siendo dos secciones distintas, y pasa por la misma
+   * lista de nombres prohibidos. La sección se busca **dentro de este negocio**:
+   * el id de otro negocio responde `404`, no se renombra nada ajeno.
+   */
+  async actualizarSeccion(id: number, nombre: string) {
+    const limpio = nombre.trim().toLowerCase();
+    this.comprobarNombreDeSeccion(limpio);
+
+    const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
+
+    if (!seccion) throw new NotFoundException(`No existe la sección ${id}`);
+
+    const repetida = await this.seccionRepo.findOneBy({
+      negocio: this.config.clave,
+      nombre: limpio,
+    });
+
+    // La misma comprobación que en el alta, pero dejando pasar la propia fila:
+    // un rename que no cambia el nombre no es un error.
+    if (repetida && repetida.id !== id) {
+      throw new ConflictException(`La sección "${limpio}" ya existe`);
+    }
+
+    seccion.nombre = limpio;
+    const guardada = await this.seccionRepo.save(seccion);
+
+    return { mensaje: 'Sección actualizada correctamente', seccion: guardada };
+  }
+
+  /**
+   * Borra una sección **vacía**.
+   *
+   * Si tiene productos se responde `409` con el número en vez de moverlos a
+   * escondidas: la base lo impediría igualmente (`producto.seccion_id` no tiene
+   * `onDelete`, así que el `DELETE` reventaría) y mandarlos a la sección de
+   * reserva los escondería de la tienda. Es el aviso que pide la propia entidad
+   * `Seccion` y es lo que permite decirle al panel qué hacer antes de borrar.
+   */
+  async eliminarSeccion(id: number) {
+    const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
+
+    if (!seccion) throw new NotFoundException(`No existe la sección ${id}`);
+    if (seccion.nombre === SECCION_RESERVADA) {
+      throw new BadRequestException(
+        `La sección "${SECCION_RESERVADA}" es la de reserva: no se puede borrar`,
+      );
+    }
+
+    const productos = await this.dulceRepo.count({ where: { seccion_id: id } });
+
+    if (productos > 0) {
+      throw new ConflictException(
+        `La sección "${seccion.nombre}" tiene ${productos} ${this.config.articulo}` +
+          `${productos === 1 ? '' : 's'}: móvelos a otra sección antes de borrarla`,
+      );
+    }
+
+    await this.seccionRepo.remove(seccion);
+
+    return { ok: true };
+  }
+
+  /**
+   * Nombres que el panel no puede usar. `dulces` es la sección por defecto y la
+   * que el `AdcController` oculta de sus respuestas, así que una sección real
+   * con ese nombre dejaría sus productos fuera de la tienda (punto 2).
+   */
+  private comprobarNombreDeSeccion(nombre: string) {
+    if (!nombre) {
+      throw new BadRequestException('El nombre de la sección no puede estar vacío');
+    }
+
+    if (nombre === SECCION_RESERVADA) {
+      throw new BadRequestException(
+        `"${SECCION_RESERVADA}" es la sección reservada del catálogo heredado: elige otro nombre`,
+      );
+    }
   }
 
   /**

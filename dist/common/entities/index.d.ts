@@ -6,4 +6,4 @@ export { Dulce } from './dulce.entity.js';
 export { Encargo } from './encargo.entity.js';
 export { Pedido } from './pedido.entity.js';
 export { Seccion } from './seccion.entity.js';
-export declare const entities: (typeof Dulce | typeof Seccion | typeof Pedido | typeof Encargo)[];
+export declare const entities: (typeof Seccion | typeof Dulce | typeof Pedido | typeof Encargo)[];

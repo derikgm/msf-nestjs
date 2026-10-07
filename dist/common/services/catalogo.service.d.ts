@@ -27,6 +27,14 @@ export declare class CatalogoService implements OnApplicationBootstrap {
         mensaje: string;
         seccion: Seccion;
     }>;
+    actualizarSeccion(id: number, nombre: string): Promise<{
+        mensaje: string;
+        seccion: Seccion;
+    }>;
+    eliminarSeccion(id: number): Promise<{
+        ok: boolean;
+    }>;
+    private comprobarNombreDeSeccion;
     crearPedido(createPedidoDto: CreatePedidoDto): Promise<{
         ok: boolean;
         pedido: Pedido;
