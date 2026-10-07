@@ -54,12 +54,12 @@ export declare class AdcController {
     }>;
     subirImagen(id: number, file: MulterFile | undefined, request: RequestConUsuario): Promise<{
         mensaje: string;
-        dulce: import("../common/entities/dulce.entity.js").Dulce;
+        producto: import("../common/entities/dulce.entity.js").Dulce;
         cuota: import("../common/services/storage-quota.service.js").ResumenCuota;
     }>;
     eliminarImagen(id: number, request: RequestConUsuario): Promise<{
         mensaje: string;
-        dulce: import("../common/entities/dulce.entity.js").Dulce;
+        producto: import("../common/entities/dulce.entity.js").Dulce;
         cuota: import("../common/services/storage-quota.service.js").ResumenCuota;
     }>;
     agregarPedido(createPedidoDto: CreatePedidoDto): Promise<{

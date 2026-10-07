@@ -71,14 +71,16 @@ let AdcController = class AdcController {
     eliminarProducto(id, request) {
         return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
     }
-    subirImagen(id, file, request) {
+    async subirImagen(id, file, request) {
         if (!file) {
             throw new BadRequestException('Falta el archivo. Envíalo como multipart/form-data en el campo "imagen"');
         }
-        return this.imagenService.subir(id, file, this.usuarioActual(request));
+        const { mensaje, dulce, cuota } = await this.imagenService.subir(id, file, this.usuarioActual(request));
+        return { mensaje, producto: dulce, cuota };
     }
-    eliminarImagen(id, request) {
-        return this.imagenService.eliminar(id, this.usuarioActual(request));
+    async eliminarImagen(id, request) {
+        const { mensaje, dulce, cuota } = await this.imagenService.eliminar(id, this.usuarioActual(request));
+        return { mensaje, producto: dulce, cuota };
     }
     agregarPedido(createPedidoDto) {
         return this.catalogo.crearPedido(createPedidoDto);
@@ -180,7 +182,7 @@ __decorate([
     __param(2, Req()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Object, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], AdcController.prototype, "subirImagen", null);
 __decorate([
     Roles('adc'),
@@ -189,7 +191,7 @@ __decorate([
     __param(1, Req()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], AdcController.prototype, "eliminarImagen", null);
 __decorate([
     Public(),

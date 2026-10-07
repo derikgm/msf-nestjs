@@ -170,7 +170,7 @@ export class AdcController {
       },
     }),
   )
-  subirImagen(
+  async subirImagen(
     @Param('id', new ParseIntPipe()) id: number,
     @UploadedFile() file: MulterFile | undefined,
     @Req() request: RequestConUsuario,
@@ -181,16 +181,30 @@ export class AdcController {
       );
     }
 
-    return this.imagenService.subir(id, file, this.usuarioActual(request));
+    const { mensaje, dulce, cuota } = await this.imagenService.subir(
+      id,
+      file,
+      this.usuarioActual(request),
+    );
+
+    // El servicio se llama `dulce` por Delys; aquí se traduce como en el resto
+    // de las rutas de ADC (ver la cabecera de la clase). Sin esto el panel
+    // leía `producto` y recibía `undefined`.
+    return { mensaje, producto: dulce, cuota };
   }
 
   @Roles('adc')
   @Delete('productos/:id/imagen')
-  eliminarImagen(
+  async eliminarImagen(
     @Param('id', new ParseIntPipe()) id: number,
     @Req() request: RequestConUsuario,
   ) {
-    return this.imagenService.eliminar(id, this.usuarioActual(request));
+    const { mensaje, dulce, cuota } = await this.imagenService.eliminar(
+      id,
+      this.usuarioActual(request),
+    );
+
+    return { mensaje, producto: dulce, cuota };
   }
 
   // Alta de pedidos: pública, por la misma razón que en Delys (el cliente no
