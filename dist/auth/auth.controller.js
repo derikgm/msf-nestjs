@@ -14,8 +14,11 @@ import { Body, Controller, Get, HttpCode, Post, Req, UnauthorizedException, } fr
 import { AuthService } from './auth.service.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
+import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { ROL_SUPERUSUARIO } from './entities/index.js';
 import { Public } from './public.decorator.js';
+import { Roles } from './roles.decorator.js';
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
@@ -29,6 +32,9 @@ let AuthController = class AuthController {
     }
     crearUsuario(dto, request) {
         return this.authService.crearUsuario(dto, this.usuarioActual(request));
+    }
+    crearUsuarioAdmin(dto, request) {
+        return this.authService.crearUsuarioAdmin(dto, this.usuarioActual(request));
     }
     changePassword(dto, request) {
         return this.authService.changePassword(this.usuarioActual(request), dto);
@@ -68,6 +74,15 @@ __decorate([
     __metadata("design:paramtypes", [CreateUsuarioDto, Object]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "crearUsuario", null);
+__decorate([
+    Roles(ROL_SUPERUSUARIO),
+    Post('admin/usuarios'),
+    __param(0, Body()),
+    __param(1, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [CreateUsuarioAdminDto, Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "crearUsuarioAdmin", null);
 __decorate([
     Post('cambiar-password'),
     HttpCode(200),

@@ -10,12 +10,12 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException, } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
-import { Usuario } from './entities/index.js';
+import { ROL_SUPERUSUARIO, Usuario } from './entities/index.js';
 import { HASH_FICTICIO, hashPassword, verifyPassword } from './password.util.js';
 import { parseDurationToSeconds } from '../common/utils/duration.util.js';
 let AuthService = class AuthService {
@@ -55,6 +55,12 @@ let AuthService = class AuthService {
     }
     async crearUsuario(dto, caller) {
         return this.crear(dto, caller.rol);
+    }
+    async crearUsuarioAdmin(dto, caller) {
+        if (caller.rol !== ROL_SUPERUSUARIO) {
+            throw new ForbiddenException('Solo un administrador puede asignar roles');
+        }
+        return this.crear(dto, dto.rol);
     }
     async changePassword(caller, dto) {
         const usuario = await this.buscarPorId(caller.sub);

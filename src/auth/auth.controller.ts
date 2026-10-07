@@ -10,9 +10,12 @@ import {
 import { AuthService } from './auth.service.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
+import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { ROL_SUPERUSUARIO } from './entities/index.js';
 import type { RequestConUsuario } from './auth.interfaces.js';
 import { Public } from './public.decorator.js';
+import { Roles } from './roles.decorator.js';
 
 @Controller('auth')
 export class AuthController {
@@ -39,6 +42,16 @@ export class AuthController {
   @Post('usuarios')
   crearUsuario(@Body() dto: CreateUsuarioDto, @Req() request: RequestConUsuario) {
     return this.authService.crearUsuario(dto, this.usuarioActual(request));
+  }
+
+  /**
+   * Alta de plataforma: solo `admin`. Aquí `rol` sale del cuerpo, no del token:
+   * es la única forma de ubicar a un usuario en un proyecto distinto del propio.
+   */
+  @Roles(ROL_SUPERUSUARIO)
+  @Post('admin/usuarios')
+  crearUsuarioAdmin(@Body() dto: CreateUsuarioAdminDto, @Req() request: RequestConUsuario) {
+    return this.authService.crearUsuarioAdmin(dto, this.usuarioActual(request));
   }
 
   @Post('cambiar-password')

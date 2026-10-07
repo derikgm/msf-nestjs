@@ -1,6 +1,7 @@
 import { AuthService } from './auth.service.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
+import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import type { RequestConUsuario } from './auth.interfaces.js';
 export declare class AuthController {
@@ -21,6 +22,15 @@ export declare class AuthController {
         };
     }>;
     crearUsuario(dto: CreateUsuarioDto, request: RequestConUsuario): Promise<{
+        mensaje: string;
+        usuario: {
+            id: string;
+            nombre: string;
+            usuario: string;
+            rol: "delys" | "domus" | "adc" | "admin";
+        };
+    }>;
+    crearUsuarioAdmin(dto: CreateUsuarioAdminDto, request: RequestConUsuario): Promise<{
         mensaje: string;
         usuario: {
             id: string;

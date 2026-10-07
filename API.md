@@ -16,6 +16,7 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `POST` | `/auth/login` | público |
 | `POST` | `/auth/registro` | público, **solo** mientras el rol no tenga usuarios |
 | `POST` | `/auth/usuarios` | cualquier rol, crea usuarios **de ese mismo rol** |
+| `POST` | `/auth/admin/usuarios` | **solo `admin`**, crea usuarios y les asigna el rol |
 | `POST` | `/auth/cambiar-password` | cualquier rol, solo la propia contraseña |
 | `GET` | `/auth/yo` | cualquier rol |
 | `GET` | `/storage/quota` | cualquier rol, devuelve la cuota de su proyecto |
@@ -143,6 +144,28 @@ curl -X POST localhost:3000/auth/usuarios \
 ```
 
 Mismo cuerpo de respuesta que `/auth/registro`. Un token de `delys` no puede crear usuarios de `domus`: si se manda `"rol":"domus"`, el usuario sale con `rol: "delys"`. Un `usuario` repetido da `409`.
+
+---
+
+### 5.1. `POST /auth/admin/usuarios`
+
+Alta de plataforma: **solo un administrador** (rol `admin`) puede consumirla, y es la única forma de crear un usuario y **asignarle el rol** que quieras (cualquier proyecto o un `admin` nuevo). Requiere `Authorization: Bearer <token>`; un token de otro rol recibe `403`.
+
+| Parámetro | Tipo | Reglas |
+| --- | --- | --- |
+| `nombre` | string | obligatorio, máx. 120 |
+| `usuario` | string | obligatorio, máx. 60, único |
+| `password` | string | obligatorio, entre 8 y 200 caracteres |
+| `rol` | string | **obligatorio**, uno de `delys`, `domus`, `adc`, `admin` |
+
+```bash
+curl -X POST localhost:3000/auth/admin/usuarios \
+  -H "Authorization: Bearer eyJ..." \
+  -H 'content-type: application/json' \
+  -d '{"nombre":"Pedro","usuario":"pedro","password":"clave-de-pedro","rol":"domus"}'
+```
+
+Mismo cuerpo de respuesta que `/auth/registro`. Un `usuario` repetido da `409` y un rol que no esté en la lista da `400`.
 
 ---
 
