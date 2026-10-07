@@ -13,8 +13,8 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 var CatalogoService_1;
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException, } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Dulce, Encargo, Pedido } from '../entities/index.js';
+import { In, IsNull, Repository } from 'typeorm';
+import { Dulce, Encargo, Pedido, Seccion } from '../entities/index.js';
 import { ofertas } from '../data/ofertas.js';
 import { NEGOCIO } from '../config/negocio.config.js';
 import { DulceImagenService } from './dulce-imagen.service.js';
@@ -26,13 +26,15 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
     pedidoRepo;
     encargoRepo;
     dulceRepo;
+    seccionRepo;
     imagenes;
     logger = new Logger(CatalogoService_1.name);
-    constructor(config, pedidoRepo, encargoRepo, dulceRepo, imagenes) {
+    constructor(config, pedidoRepo, encargoRepo, dulceRepo, seccionRepo, imagenes) {
         this.config = config;
         this.pedidoRepo = pedidoRepo;
         this.encargoRepo = encargoRepo;
         this.dulceRepo = dulceRepo;
+        this.seccionRepo = seccionRepo;
         this.imagenes = imagenes;
     }
     articuloEnMayuscula() {
@@ -41,14 +43,50 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
     }
     async onApplicationBootstrap() {
         const actuales = await this.dulceRepo.count({ where: { negocio: this.config.clave } });
-        if (actuales > 0 || this.config.catalogoInicial.length === 0)
+        if (actuales === 0 && this.config.catalogoInicial.length > 0) {
+            const semilla = this.config.catalogoInicial.map((dulce) => ({
+                ...dulce,
+                negocio: this.config.clave,
+            }));
+            await this.dulceRepo.save(this.dulceRepo.create(semilla));
+            this.logger.log(`Catálogo inicial cargado: ${semilla.length} ${this.config.articulo}s`);
+        }
+        await this.asignarSeccionDulces();
+    }
+    async asignarSeccionDulces() {
+        const sinSeccion = await this.dulceRepo.find({
+            where: { negocio: this.config.clave, seccion: IsNull() },
+        });
+        if (sinSeccion.length === 0)
             return;
-        const semilla = this.config.catalogoInicial.map((dulce) => ({
-            ...dulce,
-            negocio: this.config.clave,
-        }));
-        await this.dulceRepo.save(this.dulceRepo.create(semilla));
-        this.logger.log(`Catálogo inicial cargado: ${semilla.length} ${this.config.articulo}s`);
+        const seccion = await this.seccionDulces();
+        sinSeccion.forEach((dulce) => {
+            dulce.seccion = seccion;
+        });
+        await this.dulceRepo.save(sinSeccion);
+        this.logger.log(`${sinSeccion.length} ${this.config.articulo}${sinSeccion.length === 1 ? '' : 's'} asignado${sinSeccion.length === 1 ? '' : 's'} a la sección "dulces"`);
+    }
+    async seccionDulces(manager) {
+        const repo = manager ? manager.getRepository(Seccion) : this.seccionRepo;
+        const existente = await repo.findOneBy({ negocio: this.config.clave, nombre: 'dulces' });
+        if (existente)
+            return existente;
+        return repo.save(repo.create({ negocio: this.config.clave, nombre: 'dulces' }));
+    }
+    async listarSecciones() {
+        const secciones = await this.seccionRepo.find({
+            where: { negocio: this.config.clave },
+            order: { id: 'ASC' },
+        });
+        return { secciones };
+    }
+    async crearSeccion(nombre) {
+        const limpio = nombre.trim().toLowerCase();
+        if (await this.seccionRepo.existsBy({ negocio: this.config.clave, nombre: limpio })) {
+            throw new ConflictException(`La sección "${limpio}" ya existe`);
+        }
+        const guardada = await this.seccionRepo.save(this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio }));
+        return { mensaje: 'Sección creada correctamente', seccion: guardada };
     }
     async crearPedido(createPedidoDto) {
         const { encargos: encargosDto } = createPedidoDto;
@@ -78,6 +116,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
     async obtenerTodosDulces() {
         const dulces = await this.dulceRepo.find({
             where: { negocio: this.config.clave },
+            relations: { seccion: true },
             order: { id: 'ASC' },
         });
         return { dulces };
@@ -89,6 +128,15 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
                 .select('MAX(dulce.id)', 'maximo')
                 .getRawOne();
             const id = (siguiente?.maximo ?? 0) + 1;
+            const seccion = createDulceDto.seccion_id
+                ? await manager.findOneBy(Seccion, {
+                    id: createDulceDto.seccion_id,
+                    negocio: this.config.clave,
+                })
+                : await this.seccionDulces(manager);
+            if (createDulceDto.seccion_id && !seccion) {
+                throw new NotFoundException(`No existe la sección ${createDulceDto.seccion_id}`);
+            }
             const dulce = manager.create(Dulce, {
                 id,
                 nombre: createDulceDto.nombre.trim(),
@@ -97,6 +145,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
                 negocio: this.config.clave,
                 imagen_url: null,
                 imagen_bytes: null,
+                seccion,
             });
             const guardado = await manager.save(Dulce, dulce);
             return { mensaje: `${this.articuloEnMayuscula()} creado correctamente`, dulce: guardado };
@@ -106,9 +155,12 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         return moneda?.trim().toUpperCase() || 'CUP';
     }
     async actualizarDulce(id, updateDulceDto) {
-        const { nombre, precio, moneda } = updateDulceDto;
-        if (nombre === undefined && precio === undefined && moneda === undefined) {
-            throw new BadRequestException('No hay nada que actualizar: manda "nombre", "precio" o "moneda"');
+        const { nombre, precio, moneda, seccion_id } = updateDulceDto;
+        if (nombre === undefined &&
+            precio === undefined &&
+            moneda === undefined &&
+            seccion_id === undefined) {
+            throw new BadRequestException('No hay nada que actualizar: manda "nombre", "precio", "moneda" o "seccion_id"');
         }
         const dulce = await this.dulceRepo.findOneBy({ id, negocio: this.config.clave });
         if (!dulce)
@@ -119,6 +171,15 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
             dulce.precio = precio;
         if (moneda !== undefined)
             dulce.moneda = this.normalizarMoneda(moneda);
+        if (seccion_id !== undefined) {
+            const seccion = await this.seccionRepo.findOneBy({
+                id: seccion_id,
+                negocio: this.config.clave,
+            });
+            if (!seccion)
+                throw new NotFoundException(`No existe la sección ${seccion_id}`);
+            dulce.seccion = seccion;
+        }
         const guardado = await this.dulceRepo.save(dulce);
         return { mensaje: `${this.articuloEnMayuscula()} actualizado correctamente`, dulce: guardado };
     }
@@ -191,7 +252,9 @@ CatalogoService = CatalogoService_1 = __decorate([
     __param(1, Inject(getRepositoryToken(Pedido))),
     __param(2, Inject(getRepositoryToken(Encargo))),
     __param(3, Inject(getRepositoryToken(Dulce))),
+    __param(4, Inject(getRepositoryToken(Seccion))),
     __metadata("design:paramtypes", [Object, Repository,
+        Repository,
         Repository,
         Repository,
         DulceImagenService])

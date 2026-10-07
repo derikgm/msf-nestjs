@@ -2,6 +2,7 @@ import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
+import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import type { RequestConUsuario } from '../auth/auth.interfaces.js';
 export declare class DelysController {
@@ -14,6 +15,13 @@ export declare class DelysController {
     obtenerOfertas(): {
         ofertas: import("../common/interfaces/catalogo.interfaces.js").Dulce[];
     };
+    obtenerSecciones(): Promise<{
+        secciones: import("../common/entities/seccion.entity.js").Seccion[];
+    }>;
+    crearSeccion(createSeccionDto: CreateSeccionDto): Promise<{
+        mensaje: string;
+        seccion: import("../common/entities/seccion.entity.js").Seccion;
+    }>;
     crearDulce(createDulceDto: CreateDulceDto): Promise<{
         mensaje: string;
         dulce: import("../common/entities/dulce.entity.js").Dulce;

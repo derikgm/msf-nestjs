@@ -18,6 +18,7 @@ import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
+import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import type { AuthUser, RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
@@ -46,6 +47,22 @@ export class DelysController {
   @Get('ofertas')
   obtenerOfertas() {
     return this.catalogo.obtenerOfertas();
+  }
+
+  // Secciones de la pastelería: lectura pública para la vitrina y alta desde el
+  // panel. Aquí la sección "dulces" sí aparece: es donde vive todo el catálogo
+  // de Delys (los productos viejos se migran ahí), así que esconderla rompería
+  // la vitrina. En ADC se hace al revés (ver `AdcController`).
+  @Public()
+  @Get('secciones')
+  obtenerSecciones() {
+    return this.catalogo.listarSecciones();
+  }
+
+  @Roles('delys')
+  @Post('secciones')
+  crearSeccion(@Body() createSeccionDto: CreateSeccionDto) {
+    return this.catalogo.crearSeccion(createSeccionDto.nombre);
   }
 
   // Gestión del catálogo desde el panel de la pastelería. Estas tres rutas son

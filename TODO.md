@@ -6,6 +6,49 @@ Pendientes y cosas que hay que arreglar. Sin deadlines todavía; es una lista de
 
 ---
 
+## SECCIONES DEL CATÁLOGO (feature en curso)
+
+**Objetivo.** "Agrega a la tabla de producto una columna 'seccion' + crea secciones (FK desde producto)" y "los dulces pasan a la sección 'dulces' (ADC ya no devuelve eso); al devolver los productos de adc, devolver también sus secciones exceptuando 'dulce'". Resumen: navegación por secciones, dulces cobijados en una sección especial `dulces`, y ADC responde sus productos + secciones sin la `dulces`.
+
+**Estado (Oct 2026, environment local levantado):** implementado en `src/`, recompilado a `dist/`, **probado contra la BD local (Docker, `msf-postgres`)** y documentado. **No está commiteado todavía** (pendiente de `git add -A && git commit -m "secciones del catalogo..." && git push origin develop`).
+
+### Qué se implementó y dónde
+
+1. **Entidad `Seccion`** — `src/common/entities/seccion.entity.ts`. Tabla `seccion`: `id` PK, `nombre varchar(60)`, `negocio varchar(16) default 'delys'`, `creado_en`, `UNIQUE(negocio, nombre)`. Exportada en `src/common/entities/index.ts` y metida en el array `entities` (así `TypeOrmModule.forFeature(entities)` de `AdcModule`/`DelysModule` la provee sin tocar los módulos).
+2. **FK en `Producto`** — `src/common/entities/dulce.entity.ts`. Columnas `seccion_id int null` (declarada explícita, `@Column`) + `@ManyToOne(() => Seccion)` con `@JoinColumn({ name: 'seccion_id' })`. La interfaz `Dulce` (`src/common/interfaces/catalogo.interfaces.ts`) ganó `seccion_id: number | null`; la semilla `src/common/data/ofertas.ts` ahora manda `seccion_id: null`.
+3. **Migración de arranque** — `CatalogoService` (`src/common/services/catalogo.service.ts`):
+   - `onApplicationBootstrap()` ahora corre `asignarSeccionDulces()` **siempre** (antes el "alto si ya hay productos" devolvía antes de migrar: BUG que se cazó y se arregló). Los productos con `seccion IS NULL` pasan a la sección `dulces` de **su negocio** (la crea si hace falta, `seccionDulces()`).
+   - `crearDulce()`: si llega `seccion_id` busca la sección **dentro del mismo negocio** (`404` si no existe, aunque exista en otro); sin él, `dulces`. Corre dentro de la transacción (usa `manager`).
+   - `actualizarDulce()` acepta `seccion_id` y mueve el producto; también valida negocio. El "nada que actualizar" ahora incluye `seccion_id`.
+   - `listarSecciones()` (orden por `id`) y `crearSeccion(nombre)` (la guarda en **minúsculas**; duplicado → `409`).
+   - `obtenerTodosDulces()` con `relations: { seccion: true }` (para filtrar por nombre de sección arriba).
+4. **DTOs** — `src/common/dto/create-seccion.dto.ts` (nuevo, `nombre` obligatorio, ≤60) y `seccion_id?` (`@Type(() => Number) @IsInt @IsPositive @IsOptional`) en `create-dulce.dto.ts` y `update-dulce.dto.ts`.
+5. **Rutas** — en `src/delys/delys.controller.ts` y `src/adc/adc.controller.ts`:
+   - `GET /delys/secciones` (público, **sí** trae `dulces`), `POST /delys/secciones` (`@Roles('delys')`).
+   - `GET /adc/secciones` (público, **sin** `dulces`), `POST /adc/secciones` (`@Roles('adc')`).
+   - `GET /adc/productos` → `{ productos: [...con seccion_id y seccion nombre], secciones: [{id, nombre}] }`, y **filtra** los productos de la sección `dulces` y la propia sección `dulces`.
+   - `POST/PATCH /adc/productos` / `POST/PATCH /delys/dulces` con `seccion_id` (traducen por negocio).
+6. **Migración SQL para producción** — `migraciones/003-secciones.sql` (idempotente, a prueba de orden): crea `seccion`, añade `producto.seccion_id` con FK (solo si `producto` no tiene ya una, por si `synchronize` la creó antes) y el backfill de los productos sin sección a `dulces`.
+7. **Docs** — `API.md` (tabla + sección 20 "Secciones del catálogo"), `README.md` (tabla de rutas).
+
+### Verificado contra el local (en orden)
+
+- Arranque → `seccion` creada, `producto.seccion_id` presente, `Log` "asignados a la sección dulces" por negocio.
+- `SELECT ... FROM producto LEFT JOIN seccion ...`: delys 1-4 → delys/dulces; adc 5-6 → adc/dulces.
+- `GET /delys/dulces`: cada dulce con `seccion_id` y objeto `seccion`.
+- `POST /delys/secciones {nombre}` crea (normaliza a minúsculas); repetido → `409`.
+- `GET /adc/productos`: vacío mientras todo esté en `dulces`; crear sección `Electrónico` + producto con `seccion_id` → aparece con `seccion: "electronico"`; producto sin `seccion_id` → cae a `dulces` y queda oculto; `seccion_id` de otro negocio → `404`.
+- Datos de prueba generados se limpiaron (productos 7-8 y sección `especial` borrados; quedan secciones 2 delys/dulces, 3 adc/dulces, 4 adc/electronico).
+
+### Lo que sigue
+
+- [ ] **Commitear y pushear**: `git add -A && git commit -m "secciones del catalogo: entidad, FK, rutas y migracion" && git push origin develop`. `dist/` está versionado y ya está recompilado (`npm run build` pasa limpio).
+- [ ] (opcional) Frontend ADC: consumir `secciones` y `seccion_id`, y el `POST /adc/secciones` desde su panel.
+- [ ] (opcional, ver "Migraciones pendientes" abajo) cuando se desactive `synchronize`: generar la migración formal de TypeORM para `seccion`/`seccion_id`.
+- [ ] Recordar que `pkill -f "node server.js"` se mata a sí mismo (el patrón coincide con el comando): usar `pgrep -f "[n]ode server.js"` o `kill <pid>`.
+
+---
+
 ## Urgente por bug
 
 ### ~~Los pedidos no se pueden enviar: `POST /delys/pedido` respondía 401~~ RESUELTO

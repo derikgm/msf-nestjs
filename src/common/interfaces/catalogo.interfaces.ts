@@ -38,6 +38,8 @@ export interface Dulce {
     moneda: string,
     /** De quién es: `delys`, `adc`… (punto 6). */
     negocio: string,
+    /** A qué sección del catálogo pertenece: referencia a `seccion.id`. */
+    seccion_id: number | null,
 }
 
 export interface Encargo {

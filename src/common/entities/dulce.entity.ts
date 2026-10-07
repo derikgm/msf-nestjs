@@ -1,6 +1,7 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { numericTransformer } from '../utils/numeric.transformer.js';
 import { Dulce as DulceShape } from '../interfaces/catalogo.interfaces.js';
+import { Seccion } from './seccion.entity.js';
 
 /**
  * Un producto del catálogo, **de cualquier negocio**. La tabla se llamaba
@@ -56,4 +57,20 @@ export class Dulce implements DulceShape {
    */
   @Column({ type: 'varchar', length: 16, default: 'delys' })
   negocio: string;
+
+  /**
+   * A qué sección del catálogo pertenece (`seccion.id`), o null. La columna está
+   * declarada aquí y el `ManyToOne` apunta a la misma `.seccion_id`: así el
+   * `Dulce` expone el id como campo y la relación para leerla, sin duplicados.
+   * Nullable a propósito: los productos que existían antes de las secciones se
+   * asignan a la sección `dulces` de su negocio al arrancar
+   * (`CatalogoService.asignarSeccionDulces()`), así que solo puede ser null
+   * mientras no haya hecho esa pasada.
+   */
+  @Column({ type: 'int', nullable: true, name: 'seccion_id' })
+  seccion_id: number | null;
+
+  @ManyToOne(() => Seccion, { nullable: true })
+  @JoinColumn({ name: 'seccion_id' })
+  seccion: Seccion | null;
 }

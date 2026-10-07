@@ -15,6 +15,7 @@ export interface Dulce {
     imagen_url: string | null;
     moneda: string;
     negocio: string;
+    seccion_id: number | null;
 }
 export interface Encargo {
     dulce: Dulce;

@@ -18,6 +18,7 @@ import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
+import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import type { AuthUser, RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
@@ -52,13 +53,52 @@ export class AdcController {
     private readonly imagenService: DulceImagenService,
   ) {}
 
-  // Catálogo: público, sin token, igual que la vitrina de Delys.
+  // Catálogo: público, sin token, igual que la vitrina de Delys. Devuelve los
+  // productos y sus secciones de navegación, **exceptuando la sección "dulces"**:
+  // esa es la sección especial del catálogo heredado (los dulces de la
+  // pastelería), así que ADC ni la lista ni devuelve los productos que viven en
+  // ella. El resto del catálogo sí, compuesto por sus secciones y productos.
   @Public()
   @Get('productos')
   async obtenerProductos() {
     const { dulces } = await this.catalogo.obtenerTodosDulces();
+    const { secciones } = await this.catalogo.listarSecciones();
 
-    return { productos: dulces };
+    const visibles = dulces.filter((dulce) => dulce.seccion?.nombre !== 'dulces');
+
+    return {
+      productos: visibles.map((dulce) => ({
+        id: dulce.id,
+        nombre: dulce.nombre,
+        precio: dulce.precio,
+        moneda: dulce.moneda,
+        imagen_url: dulce.imagen_url,
+        seccion_id: dulce.seccion?.id ?? null,
+        seccion: dulce.seccion?.nombre ?? null,
+      })),
+      secciones: secciones
+        .filter((seccion) => seccion.nombre !== 'dulces')
+        .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+    };
+  }
+
+  // Secciones de ADC: lectura pública para la vitrina y alta desde el panel.
+  @Public()
+  @Get('secciones')
+  async obtenerSecciones() {
+    const { secciones } = await this.catalogo.listarSecciones();
+
+    return {
+      secciones: secciones
+        .filter((seccion) => seccion.nombre !== 'dulces')
+        .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+    };
+  }
+
+  @Roles('adc')
+  @Post('secciones')
+  crearSeccion(@Body() createSeccionDto: CreateSeccionDto) {
+    return this.catalogo.crearSeccion(createSeccionDto.nombre);
   }
 
   // Gestión del catálogo desde el panel de ADC. El id lo asigna el servidor,

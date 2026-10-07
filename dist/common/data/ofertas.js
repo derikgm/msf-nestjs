@@ -6,6 +6,7 @@ export const ofertas = [
         imagen_url: null,
         moneda: "CUP",
         negocio: "delys",
+        seccion_id: null,
     },
     {
         id: 2,
@@ -14,6 +15,7 @@ export const ofertas = [
         imagen_url: null,
         moneda: "CUP",
         negocio: "delys",
+        seccion_id: null,
     },
     {
         id: 3,
@@ -22,6 +24,7 @@ export const ofertas = [
         imagen_url: null,
         moneda: "CUP",
         negocio: "delys",
+        seccion_id: null,
     },
     {
         id: 4,
@@ -30,6 +33,7 @@ export const ofertas = [
         imagen_url: null,
         moneda: "CUP",
         negocio: "delys",
+        seccion_id: null,
     },
 ];
 //# sourceMappingURL=ofertas.js.map

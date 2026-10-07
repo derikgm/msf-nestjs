@@ -16,6 +16,7 @@ import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
+import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -33,6 +34,12 @@ let DelysController = class DelysController {
     }
     obtenerOfertas() {
         return this.catalogo.obtenerOfertas();
+    }
+    obtenerSecciones() {
+        return this.catalogo.listarSecciones();
+    }
+    crearSeccion(createSeccionDto) {
+        return this.catalogo.crearSeccion(createSeccionDto.nombre);
     }
     crearDulce(createDulceDto) {
         return this.catalogo.crearDulce(createDulceDto);
@@ -84,6 +91,21 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], DelysController.prototype, "obtenerOfertas", null);
+__decorate([
+    Public(),
+    Get('secciones'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], DelysController.prototype, "obtenerSecciones", null);
+__decorate([
+    Roles('delys'),
+    Post('secciones'),
+    __param(0, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [CreateSeccionDto]),
+    __metadata("design:returntype", void 0)
+], DelysController.prototype, "crearSeccion", null);
 __decorate([
     Roles('delys'),
     Post('dulces'),

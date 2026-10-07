@@ -9,11 +9,11 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { FindOptionsRelations, In, Repository } from 'typeorm';
+import { EntityManager, FindOptionsRelations, In, IsNull, Repository } from 'typeorm';
 import { CreatePedidoDto } from '../dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../dto/create-dulce.dto.js';
 import { UpdateDulceDto } from '../dto/update-dulce.dto.js';
-import { Dulce, Encargo, Pedido } from '../entities/index.js';
+import { Dulce, Encargo, Pedido, Seccion } from '../entities/index.js';
 import { ofertas } from '../data/ofertas.js';
 import { NEGOCIO, type NegocioConfig } from '../config/negocio.config.js';
 import { DulceImagenService } from './dulce-imagen.service.js';
@@ -49,6 +49,8 @@ export class CatalogoService implements OnApplicationBootstrap {
     private readonly encargoRepo: Repository<Encargo>,
     @Inject(getRepositoryToken(Dulce))
     private readonly dulceRepo: Repository<Dulce>,
+    @Inject(getRepositoryToken(Seccion))
+    private readonly seccionRepo: Repository<Seccion>,
     private readonly imagenes: DulceImagenService,
   ) {}
 
@@ -73,15 +75,92 @@ export class CatalogoService implements OnApplicationBootstrap {
   async onApplicationBootstrap() {
     const actuales = await this.dulceRepo.count({ where: { negocio: this.config.clave } });
 
-    if (actuales > 0 || this.config.catalogoInicial.length === 0) return;
+    if (actuales === 0 && this.config.catalogoInicial.length > 0) {
+      const semilla = this.config.catalogoInicial.map((dulce) => ({
+        ...dulce,
+        negocio: this.config.clave,
+      }));
 
-    const semilla = this.config.catalogoInicial.map((dulce) => ({
-      ...dulce,
-      negocio: this.config.clave,
-    }));
+      await this.dulceRepo.save(this.dulceRepo.create(semilla));
+      this.logger.log(`Catálogo inicial cargado: ${semilla.length} ${this.config.articulo}s`);
+    }
 
-    await this.dulceRepo.save(this.dulceRepo.create(semilla));
-    this.logger.log(`Catálogo inicial cargado: ${semilla.length} ${this.config.articulo}s`);
+    // Los productos que llegaron sin sección pasan a "dulces", tanto los recién
+    // sembrados como los que ya existían cuando se añadió la columna (punto de
+    // secciones). Corre en cada arranque, no solo cuando se siembra: la tabla
+    // puede estar llena y aun así tener filas sin asignar.
+    await this.asignarSeccionDulces();
+  }
+
+  /**
+   * Los `productos` de este negocio que no tienen sección pasan a la sección
+   * `dulces`. Es la pasada de migración que evita que el sistema explote al
+   * añadir la columna: el catálogo heredado (los dulces de la pastelería) queda
+   * cobijado bajo su propia sección, y se ejecuta en cada arranque por si una
+   * fila se quedó sin asignar.
+   */
+  async asignarSeccionDulces() {
+    const sinSeccion = await this.dulceRepo.find({
+      where: { negocio: this.config.clave, seccion: IsNull() },
+    });
+
+    if (sinSeccion.length === 0) return;
+
+    const seccion = await this.seccionDulces();
+
+    sinSeccion.forEach((dulce) => {
+      dulce.seccion = seccion;
+    });
+
+    await this.dulceRepo.save(sinSeccion);
+
+    this.logger.log(
+      `${sinSeccion.length} ${this.config.articulo}${sinSeccion.length === 1 ? '' : 's'} asignado${sinSeccion.length === 1 ? '' : 's'} a la sección "dulces"`,
+    );
+  }
+
+  /**
+   * Devuelve la sección `dulces` de este negocio, creándola si hace falta. Es el
+   * valor por defecto de los productos sin sección y el de todos los que no
+   * manden `seccion_id` al darse de alta.
+   */
+  private async seccionDulces(manager?: EntityManager): Promise<Seccion> {
+    const repo = manager ? manager.getRepository(Seccion) : this.seccionRepo;
+    const existente = await repo.findOneBy({ negocio: this.config.clave, nombre: 'dulces' });
+
+    if (existente) return existente;
+
+    return repo.save(repo.create({ negocio: this.config.clave, nombre: 'dulces' }));
+  }
+
+  /** Las secciones del catálogo de este negocio, en orden de creación. */
+  async listarSecciones() {
+    const secciones = await this.seccionRepo.find({
+      where: { negocio: this.config.clave },
+      order: { id: 'ASC' },
+    });
+
+    return { secciones };
+  }
+
+  /**
+   * Alta de una sección desde el panel. El nombre se guarda en minúsculas, para
+   * que "Electronico" y "electronico" no acaben como dos secciones distintas. Una
+   * sección repetida en el mismo negocio da `409` (la base lo impone con el
+   * `UNIQUE(negocio, nombre)` y aquí se traduce a un mensaje claro).
+   */
+  async crearSeccion(nombre: string) {
+    const limpio = nombre.trim().toLowerCase();
+
+    if (await this.seccionRepo.existsBy({ negocio: this.config.clave, nombre: limpio })) {
+      throw new ConflictException(`La sección "${limpio}" ya existe`);
+    }
+
+    const guardada = await this.seccionRepo.save(
+      this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio }),
+    );
+
+    return { mensaje: 'Sección creada correctamente', seccion: guardada };
   }
 
   /**
@@ -128,6 +207,7 @@ export class CatalogoService implements OnApplicationBootstrap {
   async obtenerTodosDulces() {
     const dulces = await this.dulceRepo.find({
       where: { negocio: this.config.clave },
+      relations: { seccion: true },
       order: { id: 'ASC' },
     });
 
@@ -152,6 +232,20 @@ export class CatalogoService implements OnApplicationBootstrap {
 
       const id = (siguiente?.maximo ?? 0) + 1;
 
+      // Sin `seccion_id` el producto cae en "dulces", la sección que cobija al
+      // catálogo heredado. Con él, la sección tiene que existir dentro de este
+      // negocio: apuntar a una de otro negocio es un error, no un producto invisible.
+      const seccion = createDulceDto.seccion_id
+        ? await manager.findOneBy(Seccion, {
+            id: createDulceDto.seccion_id,
+            negocio: this.config.clave,
+          })
+        : await this.seccionDulces(manager);
+
+      if (createDulceDto.seccion_id && !seccion) {
+        throw new NotFoundException(`No existe la sección ${createDulceDto.seccion_id}`);
+      }
+
       const dulce = manager.create(Dulce, {
         id,
         nombre: createDulceDto.nombre.trim(),
@@ -160,6 +254,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         negocio: this.config.clave,
         imagen_url: null,
         imagen_bytes: null,
+        seccion,
       });
 
       const guardado = await manager.save(Dulce, dulce);
@@ -182,11 +277,16 @@ export class CatalogoService implements OnApplicationBootstrap {
    * válido: en ese caso los dos cambian.
    */
   async actualizarDulce(id: number, updateDulceDto: UpdateDulceDto) {
-    const { nombre, precio, moneda } = updateDulceDto;
+    const { nombre, precio, moneda, seccion_id } = updateDulceDto;
 
-    if (nombre === undefined && precio === undefined && moneda === undefined) {
+    if (
+      nombre === undefined &&
+      precio === undefined &&
+      moneda === undefined &&
+      seccion_id === undefined
+    ) {
       throw new BadRequestException(
-        'No hay nada que actualizar: manda "nombre", "precio" o "moneda"',
+        'No hay nada que actualizar: manda "nombre", "precio", "moneda" o "seccion_id"',
       );
     }
 
@@ -197,6 +297,21 @@ export class CatalogoService implements OnApplicationBootstrap {
     if (nombre !== undefined) dulce.nombre = nombre.trim();
     if (precio !== undefined) dulce.precio = precio;
     if (moneda !== undefined) dulce.moneda = this.normalizarMoneda(moneda);
+
+    // Mover el producto entre secciones. La nueva sección tiene que ser de este
+    // negocio (ver `crearDulce`); el DTO exige un id de sección positivo y no
+    // admite "quitar sección", o sea que a "sin sección" no se vuelve: lo más
+    // parecido es moverlo a la sección "dulces" de su negocio por id.
+    if (seccion_id !== undefined) {
+      const seccion = await this.seccionRepo.findOneBy({
+        id: seccion_id,
+        negocio: this.config.clave,
+      });
+
+      if (!seccion) throw new NotFoundException(`No existe la sección ${seccion_id}`);
+
+      dulce.seccion = seccion;
+    }
 
     const guardado = await this.dulceRepo.save(dulce);
 

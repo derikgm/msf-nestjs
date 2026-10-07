@@ -7,8 +7,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn } from 'typeorm';
 import { numericTransformer } from '../utils/numeric.transformer.js';
+import { Seccion } from './seccion.entity.js';
 let Dulce = class Dulce {
     id;
     nombre;
@@ -17,6 +18,8 @@ let Dulce = class Dulce {
     imagen_bytes;
     moneda;
     negocio;
+    seccion_id;
+    seccion;
 };
 __decorate([
     PrimaryColumn({ type: 'int' }),
@@ -51,6 +54,15 @@ __decorate([
     Column({ type: 'varchar', length: 16, default: 'delys' }),
     __metadata("design:type", String)
 ], Dulce.prototype, "negocio", void 0);
+__decorate([
+    Column({ type: 'int', nullable: true, name: 'seccion_id' }),
+    __metadata("design:type", Object)
+], Dulce.prototype, "seccion_id", void 0);
+__decorate([
+    ManyToOne(() => Seccion, { nullable: true }),
+    JoinColumn({ name: 'seccion_id' }),
+    __metadata("design:type", Object)
+], Dulce.prototype, "seccion", void 0);
 Dulce = __decorate([
     Entity('producto')
 ], Dulce);

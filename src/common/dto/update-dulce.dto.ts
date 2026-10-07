@@ -1,5 +1,14 @@
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 /**
  * Edición parcial de un dulce: se manda solo lo que cambia. Los tres campos son
@@ -37,4 +46,15 @@ export class UpdateDulceDto {
   @IsString({ message: 'La moneda tiene que ser texto' })
   @MaxLength(8, { message: 'La moneda no puede pasar de 8 letras' })
   moneda?: string;
+
+  /**
+   * Sección a la que se mueve el producto: el `id` de la tabla `seccion`. Trata
+   * de mover un producto a una sección de otro negocio da `404` (la sección se
+   * busca dentro de este negocio, nunca fuera).
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'La sección tiene que ser un número (el id de la sección)' })
+  @IsPositive({ message: 'La sección tiene que ser un id válido' })
+  seccion_id?: number;
 }

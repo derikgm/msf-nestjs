@@ -1,8 +1,10 @@
 import { Type } from 'class-transformer';
 import {
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   MaxLength,
   Min,
@@ -46,4 +48,15 @@ export class CreateDulceDto {
   @IsString({ message: 'La moneda tiene que ser texto' })
   @MaxLength(8, { message: 'La moneda no puede pasar de 8 letras' })
   moneda?: string;
+
+  /**
+   * Sección a la que pertenece: el `id` de la tabla `seccion`. Opcional: si no
+   * llega, el servidor lo mete en la sección `dulces` de su negocio (el valor
+   * seguro que da cobijo a los productos sin sección).
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: 'La sección tiene que ser un número (el id de la sección)' })
+  @IsPositive({ message: 'La sección tiene que ser un id válido' })
+  seccion_id?: number;
 }

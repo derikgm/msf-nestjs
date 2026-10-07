@@ -32,11 +32,12 @@ Cada token lleva un **rol** y hay dos guards: el de autenticación (firma + que 
 
 | Ruta | Rol |
 | --- | --- |
-| `GET /ping`, `GET /delys/dulces`, `GET /delys/ofertas`, `POST /auth/login` | público |
+| `GET /ping`, `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /adc/productos`, `GET /adc/secciones`, `POST /auth/login` | público |
 | `POST /auth/registro` | público **solo** mientras el rol no tenga ningún usuario |
 | `POST /delys/pedido` | **público** (el cliente no tiene cuenta) |
 | `GET /delys/pedidos`, `GET /delys/pedidos/:id`, `DELETE /delys/pedidos/:id` | `delys` |
 | `POST /delys/dulces/:id/imagen`, `DELETE /delys/dulces/:id/imagen` | `delys` |
+| `POST /delys/secciones`, `POST /adc/secciones` | `delys` / `adc` (secciones del panel) |
 | `POST /auth/usuarios`, `POST /auth/cambiar-password`, `GET /auth/yo`, `GET /storage/quota` | el que sea |
 | `POST /auth/admin/usuarios` | **solo `admin`**, crea usuarios y les asigna el rol |
 

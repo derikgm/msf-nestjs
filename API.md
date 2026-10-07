@@ -13,6 +13,11 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/ping` | público |
 | `GET` | `/delys/dulces` | público |
 | `GET` | `/delys/ofertas` | público |
+| `GET` | `/delys/secciones` | público |
+| `POST` | `/delys/secciones` | `delys` o `admin`, **alta de sección** |
+| `GET` | `/adc/productos` | público, devuelve `productos` **y** `secciones`, sin la sección `dulces` |
+| `GET` | `/adc/secciones` | público, sin la sección `dulces` |
+| `POST` | `/adc/secciones` | `adc` o `admin`, **alta de sección** |
 | `POST` | `/auth/login` | público |
 | `POST` | `/auth/registro` | público, **solo** mientras el rol no tenga usuarios |
 | `POST` | `/auth/usuarios` | cualquier rol, crea usuarios **de ese mismo rol** |
@@ -21,7 +26,7 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/auth/yo` | cualquier rol |
 | `GET` | `/storage/quota` | cualquier rol, devuelve la cuota de su proyecto |
 | `POST` | `/delys/dulces` | `delys` o `admin`, **alta en el catálogo** |
-| `PATCH` | `/delys/dulces/:id` | `delys` o `admin`, **edita nombre, precio o moneda** |
+| `PATCH` | `/delys/dulces/:id` | `delys` o `admin`, **edita nombre, precio, moneda o sección** |
 | `DELETE` | `/delys/dulces/:id` | `delys` o `admin`, **borra del catálogo** |
 | `POST` | `/delys/pedido` | **público** |
 | `GET` | `/delys/pedidos` | `delys` o `admin` |
@@ -571,6 +576,66 @@ curl -X DELETE localhost:3000/delys/dulces/12 -H "Authorization: Bearer eyJ..."
 | no se pudo contar los pedidos | `503`: no se borra. Ante la duda se bloquea: perder un pedido es peor que dejar un dulce en el catálogo |
 
 Un dulce se puede borrar siempre que sus pedidos estén resueltos: al resolver un pedido (hecho o cancelado) sus encargos se van en cascada con él y el dulce queda libre.
+
+---
+
+### 20. Secciones del catálogo
+
+El catálogo se navega por secciones (tabla `seccion`), y cada producto pertenece a una (`producto.seccion_id`). La sección **`dulces`** es la especial del catálogo heredado: los productos que existían antes de las secciones se migran ahí. La pastelería la muestra con normalidad (es donde vive todo su catálogo); **ADC la esconde** porque es el catálogo ajeno.
+
+Los nombres se guardan en minúsculas (`Electronico` pasa a `electronico`) y deben ser únicos dentro de cada negocio.
+
+#### 20.1. `GET /delys/secciones` y `GET /adc/secciones`
+
+Públicas. Devuelven las secciones del negocio, en orden de creación, **sin** la sección `dulces` en el caso de ADC:
+
+```bash
+curl localhost:3000/delys/secciones
+# -> { "secciones": [ { "id": 2, "nombre": "dulces" } ] }
+curl localhost:3000/adc/secciones
+# -> { "secciones": [ { "id": 4, "nombre": "electronico" } ] }
+```
+
+#### 20.2. `POST /delys/secciones` y `POST /adc/secciones`
+
+Alta desde el panel, con token del negocio (o `admin`, que entra a todo):
+
+```bash
+curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" -d '{"nombre":"Electronico"}'
+# -> { "mensaje": "Sección creada correctamente", "seccion": { "id": 5, "nombre": "electronico", ... } }
+```
+
+| Situación | Respuesta |
+| --- | --- |
+| `nombre` vacío o de más de 60 letras | `400` |
+| sección repetida en el mismo negocio | `409`: `La sección "electronico" ya existe` |
+| sin token / rol equivocado | `401` / `403` |
+
+#### 20.3. Sección de un producto (`seccion_id`)
+
+`POST /delys/dulces`, `PATCH /delys/dulces/:id` (y sus equivalentes `/adc/productos`) aceptan `seccion_id` opcional. Sin él, el producto cae en la sección `dulces` de su negocio (la que cobija lo heredado):
+
+| Situación | Respuesta |
+| --- | --- |
+| `seccion_id` de una sección de **otro negocio** | `404`: `No existe la sección 1` |
+| producto sin `seccion_id` al crearse | se asigna a `dulces` de su negocio |
+| mover un producto con `PATCH` | `PATCH` con `{"seccion_id": 5}`; no hay forma de dejarlo "sin sección", lo más parecido es la propia `dulces` |
+
+#### 20.4. `GET /adc/productos`
+
+Devuelve **productos y secciones**, y excluye la sección `dulces` (ni la lista ni los productos que viven en ella):
+
+```bash
+curl localhost:3000/adc/productos
+# -> {
+#      "productos": [ { "id": 7, "nombre": "Inversor 1500W", "precio": 18500, "moneda": "CUP",
+#                       "imagen_url": null, "seccion_id": 4, "seccion": "electronico" } ],
+#      "secciones": [ { "id": 4, "nombre": "electronico" } ]
+#    }
+```
+
+`/delys/dulces` no cambia de forma: sigue devolviendo los dulces con su `seccion_id` y su objeto `seccion` encima.
 
 ---
 

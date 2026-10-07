@@ -3,7 +3,7 @@ import { Repository } from 'typeorm';
 import { CreatePedidoDto } from '../dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../dto/create-dulce.dto.js';
 import { UpdateDulceDto } from '../dto/update-dulce.dto.js';
-import { Dulce, Encargo, Pedido } from '../entities/index.js';
+import { Dulce, Encargo, Pedido, Seccion } from '../entities/index.js';
 import { type NegocioConfig } from '../config/negocio.config.js';
 import { DulceImagenService } from './dulce-imagen.service.js';
 import type { AuthUser } from '../../auth/auth.interfaces.js';
@@ -12,11 +12,21 @@ export declare class CatalogoService implements OnApplicationBootstrap {
     private readonly pedidoRepo;
     private readonly encargoRepo;
     private readonly dulceRepo;
+    private readonly seccionRepo;
     private readonly imagenes;
     private readonly logger;
-    constructor(config: NegocioConfig, pedidoRepo: Repository<Pedido>, encargoRepo: Repository<Encargo>, dulceRepo: Repository<Dulce>, imagenes: DulceImagenService);
+    constructor(config: NegocioConfig, pedidoRepo: Repository<Pedido>, encargoRepo: Repository<Encargo>, dulceRepo: Repository<Dulce>, seccionRepo: Repository<Seccion>, imagenes: DulceImagenService);
     private articuloEnMayuscula;
     onApplicationBootstrap(): Promise<void>;
+    asignarSeccionDulces(): Promise<void>;
+    private seccionDulces;
+    listarSecciones(): Promise<{
+        secciones: Seccion[];
+    }>;
+    crearSeccion(nombre: string): Promise<{
+        mensaje: string;
+        seccion: Seccion;
+    }>;
     crearPedido(createPedidoDto: CreatePedidoDto): Promise<{
         ok: boolean;
         pedido: Pedido;

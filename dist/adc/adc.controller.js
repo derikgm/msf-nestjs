@@ -16,6 +16,7 @@ import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
+import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -30,7 +31,33 @@ let AdcController = class AdcController {
     }
     async obtenerProductos() {
         const { dulces } = await this.catalogo.obtenerTodosDulces();
-        return { productos: dulces };
+        const { secciones } = await this.catalogo.listarSecciones();
+        const visibles = dulces.filter((dulce) => dulce.seccion?.nombre !== 'dulces');
+        return {
+            productos: visibles.map((dulce) => ({
+                id: dulce.id,
+                nombre: dulce.nombre,
+                precio: dulce.precio,
+                moneda: dulce.moneda,
+                imagen_url: dulce.imagen_url,
+                seccion_id: dulce.seccion?.id ?? null,
+                seccion: dulce.seccion?.nombre ?? null,
+            })),
+            secciones: secciones
+                .filter((seccion) => seccion.nombre !== 'dulces')
+                .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+        };
+    }
+    async obtenerSecciones() {
+        const { secciones } = await this.catalogo.listarSecciones();
+        return {
+            secciones: secciones
+                .filter((seccion) => seccion.nombre !== 'dulces')
+                .map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+        };
+    }
+    crearSeccion(createSeccionDto) {
+        return this.catalogo.crearSeccion(createSeccionDto.nombre);
     }
     async crearProducto(createDulceDto) {
         const { mensaje, dulce } = await this.catalogo.crearDulce(createDulceDto);
@@ -77,6 +104,21 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], AdcController.prototype, "obtenerProductos", null);
+__decorate([
+    Public(),
+    Get('secciones'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], AdcController.prototype, "obtenerSecciones", null);
+__decorate([
+    Roles('adc'),
+    Post('secciones'),
+    __param(0, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [CreateSeccionDto]),
+    __metadata("design:returntype", void 0)
+], AdcController.prototype, "crearSeccion", null);
 __decorate([
     Roles('adc'),
     Post('productos'),
