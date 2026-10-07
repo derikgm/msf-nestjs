@@ -23,6 +23,7 @@ import { StorageQuotaService } from './storage-quota.service.js';
 const BUCKET_POR_ROL = {
     delys: 'delys',
     domus: 'domus',
+    adc: 'adc',
 };
 let DulceImagenService = DulceImagenService_1 = class DulceImagenService {
     config;

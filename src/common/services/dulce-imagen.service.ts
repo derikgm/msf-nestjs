@@ -11,10 +11,11 @@ import type { AuthUser } from '../../auth/auth.interfaces.js';
 
 export type MulterFile = Express.Multer.File;
 
-/** Un bucket por proyecto. */
+/** Un bucket por proyecto. El que falte lo crea el servidor al subir (ver `SupabaseService`). */
 const BUCKET_POR_ROL: Record<string, string> = {
   delys: 'delys',
   domus: 'domus',
+  adc: 'adc',
 };
 
 @Injectable()

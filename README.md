@@ -97,7 +97,7 @@ curl -X POST localhost:3000/delys/dulces/1/imagen \
 curl -X DELETE localhost:3000/delys/dulces/1/imagen -H "Authorization: Bearer eyJ..."
 ```
 
-El bucket es el del rol (`delys`/`domus`), o sea un bucket por proyecto. Cada bucket tiene que existir y ser público de lectura en el panel de Supabase.
+El bucket es el del rol (`delys`/`domus`/`adc`), o sea un bucket por proyecto. Los tres están declarados en `BUCKET_POR_ROL` (`src/common/services/dulce-imagen.service.ts`) y **los que falten los crea el propio servidor en la primera subida**: si Storage contesta *Bucket not found*, `SupabaseService` crea el bucket (público de lectura, como `delys`) y repite la subida. El de `adc` se creó el 2026-10-07, cuando la subida de una foto devolvía `500` porque no existía.
 
 Lo que decide el servidor, no el cliente:
 
