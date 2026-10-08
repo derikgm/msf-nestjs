@@ -21,3 +21,15 @@ export interface Encargo {
     dulce: Dulce;
     cantidad: number;
 }
+export interface DulcePublico {
+    id: number;
+    nombre: string;
+    precio: number;
+    imagen_url: string | null;
+    moneda: string;
+    seccion_id: number | null;
+    seccion: {
+        id: number;
+        nombre: string;
+    } | null;
+}

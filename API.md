@@ -335,12 +335,12 @@ curl localhost:3000/delys/dulces
 ```json
 {
   "dulces": [
-    { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "imagen_bytes": null, "moneda": "CUP" }
+    { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "moneda": "CUP", "seccion_id": 1, "seccion": { "id": 1, "nombre": "dulces" } }
   ]
 }
 ```
 
-`imagen_url` es `null` hasta que se suba una imagen por `/delys/dulces/:id/imagen`; `imagen_bytes` es el tamaño del archivo y existe para poder devolver los bytes a la cuota al borrar.
+`imagen_url` es `null` hasta que se suba una imagen por `/delys/dulces/:id/imagen`. El `imagen_bytes` (tamaño del archivo, contador interno de la cuota de Storage) **no** sale en la API (N-15): es un dato del servidor para poder devolver los bytes a la cuota al borrar, y el cliente no lo usa.
 
 `moneda` es la moneda en la que se lee `precio`. Es **texto de hasta 8 letras y no un enum** (`varchar(8)`, por defecto `CUP`): así caben hoy `USD`, `EUR`, `MLC`… y mañana otra sin migrar nada ni tocar el servidor. Las filas que ya existían en la base se crearon todas en `CUP`.
 
@@ -584,7 +584,7 @@ curl -X POST localhost:3000/delys/dulces \
 ```json
 {
   "mensaje": "Dulce creado correctamente",
-  "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 1800, "imagen_url": null, "imagen_bytes": null, "moneda": "USD" }
+  "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 1800, "imagen_url": null, "moneda": "USD", "seccion_id": null, "seccion": null }
 }
 ```
 
@@ -625,7 +625,7 @@ curl -X PATCH localhost:3000/delys/dulces/12 \
 ```
 
 ```json
-{ "mensaje": "Dulce actualizado correctamente", "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 2100, "imagen_url": null, "imagen_bytes": null, "moneda": "EUR" } }
+{ "mensaje": "Dulce actualizado correctamente", "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 2100, "imagen_url": null, "moneda": "EUR", "seccion_id": null, "seccion": null } }
 ```
 
 | Situación | Respuesta |

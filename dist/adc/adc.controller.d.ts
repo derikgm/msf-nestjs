@@ -24,6 +24,7 @@ export declare class AdcController {
             nombre: string;
         }[];
     }>;
+    private aProducto;
     obtenerSecciones(): Promise<{
         secciones: {
             id: number;
@@ -43,11 +44,27 @@ export declare class AdcController {
     }>;
     crearProducto(createDulceDto: CreateDulceDto): Promise<{
         mensaje: string;
-        producto: import("../common/entities/dulce.entity.js").Dulce;
+        producto: {
+            id: number;
+            nombre: string;
+            precio: number;
+            moneda: string;
+            imagen_url: string | null;
+            seccion_id: number | null;
+            seccion: string | null;
+        };
     }>;
     actualizarProducto(id: number, updateDulceDto: UpdateDulceDto): Promise<{
         mensaje: string;
-        producto: import("../common/entities/dulce.entity.js").Dulce;
+        producto: {
+            id: number;
+            nombre: string;
+            precio: number;
+            moneda: string;
+            imagen_url: string | null;
+            seccion_id: number | null;
+            seccion: string | null;
+        };
     }>;
     eliminarProducto(id: number, request: RequestConUsuario): Promise<{
         ok: boolean;

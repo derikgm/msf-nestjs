@@ -10,7 +10,7 @@ export declare class DelysController {
     private readonly imagenService;
     constructor(catalogo: CatalogoService, imagenService: DulceImagenService);
     obtenerDulces(): Promise<{
-        dulces: import("../common/entities/dulce.entity.js").Dulce[];
+        dulces: import("../common/interfaces/catalogo.interfaces.js").DulcePublico[];
     }>;
     obtenerOfertas(): {
         ofertas: import("../common/interfaces/catalogo.interfaces.js").Dulce[];
@@ -24,11 +24,11 @@ export declare class DelysController {
     }>;
     crearDulce(createDulceDto: CreateDulceDto): Promise<{
         mensaje: string;
-        dulce: import("../common/entities/dulce.entity.js").Dulce;
+        dulce: import("../common/interfaces/catalogo.interfaces.js").DulcePublico;
     }>;
     actualizarDulce(id: number, updateDulceDto: UpdateDulceDto): Promise<{
         mensaje: string;
-        dulce: import("../common/entities/dulce.entity.js").Dulce;
+        dulce: import("../common/interfaces/catalogo.interfaces.js").DulcePublico;
     }>;
     eliminarDulce(id: number, request: RequestConUsuario): Promise<{
         ok: boolean;

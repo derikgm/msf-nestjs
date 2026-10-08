@@ -14,6 +14,7 @@ import { CreatePedidoDto } from '../dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../dto/create-dulce.dto.js';
 import { UpdateDulceDto } from '../dto/update-dulce.dto.js';
 import { Dulce, Encargo, Pedido, Seccion } from '../entities/index.js';
+import type { DulcePublico } from '../interfaces/catalogo.interfaces.js';
 import { ofertas } from '../data/ofertas.js';
 import { NEGOCIO, type NegocioConfig } from '../config/negocio.config.js';
 import { DulceImagenService } from './dulce-imagen.service.js';
@@ -315,7 +316,27 @@ export class CatalogoService implements OnApplicationBootstrap {
       order: { id: 'ASC' },
     });
 
-    return { dulces };
+    // N-15: solo los campos públicos. `imagen_bytes` (contador de la cuota de
+    // Storage) y `negocio` (filtro del servidor) no salen en el GET.
+    return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+  }
+
+  /**
+   * Proyección pública de un dulce (N-15): lo que ve el cliente. La sección va
+   * como objeto (la relación cargada); cada controlador la enseña a su manera.
+   */
+  private proyectar(dulce: Dulce): DulcePublico {
+    return {
+      id: dulce.id,
+      nombre: dulce.nombre,
+      precio: dulce.precio,
+      imagen_url: dulce.imagen_url,
+      moneda: dulce.moneda,
+      // En `crearDulce` la relación recién asignada aún no ha rellenado la
+      // columna: se cae al `.seccion?.id` si la columna no llegó.
+      seccion_id: dulce.seccion_id ?? dulce.seccion?.id ?? null,
+      seccion: dulce.seccion ?? null,
+    };
   }
 
   /**
@@ -363,7 +384,8 @@ export class CatalogoService implements OnApplicationBootstrap {
 
       const guardado = await manager.save(Dulce, dulce);
 
-      return { mensaje: `${this.articuloEnMayuscula()} creado correctamente`, dulce: guardado };
+      // N-15: la respuesta del alta también proyecta solo los campos públicos.
+      return { mensaje: `${this.articuloEnMayuscula()} creado correctamente`, dulce: this.proyectar(guardado) };
     });
   }
 
@@ -419,7 +441,8 @@ export class CatalogoService implements OnApplicationBootstrap {
 
     const guardado = await this.dulceRepo.save(dulce);
 
-    return { mensaje: `${this.articuloEnMayuscula()} actualizado correctamente`, dulce: guardado };
+    // N-15: proyecta solo los campos públicos, igual que el alta y el GET.
+    return { mensaje: `${this.articuloEnMayuscula()} actualizado correctamente`, dulce: this.proyectar(guardado) };
   }
 
   /**

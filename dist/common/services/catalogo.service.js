@@ -167,7 +167,18 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
             relations: { seccion: true },
             order: { id: 'ASC' },
         });
-        return { dulces };
+        return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+    }
+    proyectar(dulce) {
+        return {
+            id: dulce.id,
+            nombre: dulce.nombre,
+            precio: dulce.precio,
+            imagen_url: dulce.imagen_url,
+            moneda: dulce.moneda,
+            seccion_id: dulce.seccion_id ?? dulce.seccion?.id ?? null,
+            seccion: dulce.seccion ?? null,
+        };
     }
     async crearDulce(createDulceDto) {
         return this.dulceRepo.manager.transaction(async (manager) => {
@@ -196,7 +207,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
                 seccion,
             });
             const guardado = await manager.save(Dulce, dulce);
-            return { mensaje: `${this.articuloEnMayuscula()} creado correctamente`, dulce: guardado };
+            return { mensaje: `${this.articuloEnMayuscula()} creado correctamente`, dulce: this.proyectar(guardado) };
         });
     }
     normalizarMoneda(moneda) {
@@ -229,7 +240,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
             dulce.seccion = seccion;
         }
         const guardado = await this.dulceRepo.save(dulce);
-        return { mensaje: `${this.articuloEnMayuscula()} actualizado correctamente`, dulce: guardado };
+        return { mensaje: `${this.articuloEnMayuscula()} actualizado correctamente`, dulce: this.proyectar(guardado) };
     }
     async eliminarDulce(id, caller) {
         const dulce = await this.dulceRepo.findOneBy({ id, negocio: this.config.clave });

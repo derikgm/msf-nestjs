@@ -46,3 +46,26 @@ export interface Encargo {
     dulce: Dulce,
     cantidad: number,
 }
+
+/**
+ * Un dulce tal como se enseña en la API (N-15): los campos públicos, sin
+ * `imagen_bytes` (contador interno de la cuota de Storage, no le dice nada al
+ * cliente) ni `negocio` (columna que sirve para filtrar, no para mostrar).
+ *
+ * `seccion` es el objeto tal cual lo carga la relación; luego cada controlador
+ * decide cómo lo enseña: Delys lo deja como objeto y ADC lo traduce a su
+ * nombre (ver `AdcController.aProducto()`), así que aquí no se impone forma.
+ */
+export interface DulcePublico {
+    id: number,
+    nombre: string,
+    precio: number,
+    /** URL pública del archivo en Supabase Storage; null si no tiene imagen. */
+    imagen_url: string | null,
+    /** Moneda del `precio` (`'CUP'`, `'USD'`…). Texto libre de hasta 8 letras. */
+    moneda: string,
+    /** A qué sección del catálogo pertenece: referencia a `seccion.id`. */
+    seccion_id: number | null,
+    /** La sección cargada por la relación, o null si no está asignada. */
+    seccion: { id: number; nombre: string } | null,
+}

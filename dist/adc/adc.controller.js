@@ -33,16 +33,19 @@ let AdcController = class AdcController {
         const { dulces } = await this.catalogo.obtenerTodosDulces();
         const { secciones } = await this.catalogo.listarSecciones();
         return {
-            productos: dulces.map((dulce) => ({
-                id: dulce.id,
-                nombre: dulce.nombre,
-                precio: dulce.precio,
-                moneda: dulce.moneda,
-                imagen_url: dulce.imagen_url,
-                seccion_id: dulce.seccion?.id ?? null,
-                seccion: dulce.seccion?.nombre ?? null,
-            })),
+            productos: dulces.map((dulce) => this.aProducto(dulce)),
             secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+        };
+    }
+    aProducto(dulce) {
+        return {
+            id: dulce.id,
+            nombre: dulce.nombre,
+            precio: dulce.precio,
+            moneda: dulce.moneda,
+            imagen_url: dulce.imagen_url,
+            seccion_id: dulce.seccion_id,
+            seccion: dulce.seccion?.nombre ?? null,
         };
     }
     async obtenerSecciones() {
@@ -62,11 +65,11 @@ let AdcController = class AdcController {
     }
     async crearProducto(createDulceDto) {
         const { mensaje, dulce } = await this.catalogo.crearDulce(createDulceDto);
-        return { mensaje, producto: dulce };
+        return { mensaje, producto: this.aProducto(dulce) };
     }
     async actualizarProducto(id, updateDulceDto) {
         const { mensaje, dulce } = await this.catalogo.actualizarDulce(id, updateDulceDto);
-        return { mensaje, producto: dulce };
+        return { mensaje, producto: this.aProducto(dulce) };
     }
     eliminarProducto(id, request) {
         return this.catalogo.eliminarDulce(id, usuarioActual(request));

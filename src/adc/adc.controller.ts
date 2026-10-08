@@ -18,6 +18,7 @@ import { interceptorDeImagen } from '../common/uploads/imagen.archivo.js';
 import { usuarioActual } from '../common/utils/auth.util.js';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
+import type { DulcePublico } from '../common/interfaces/catalogo.interfaces.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
@@ -70,16 +71,25 @@ export class AdcController {
     const { secciones } = await this.catalogo.listarSecciones();
 
     return {
-      productos: dulces.map((dulce) => ({
-        id: dulce.id,
-        nombre: dulce.nombre,
-        precio: dulce.precio,
-        moneda: dulce.moneda,
-        imagen_url: dulce.imagen_url,
-        seccion_id: dulce.seccion?.id ?? null,
-        seccion: dulce.seccion?.nombre ?? null,
-      })),
+      productos: dulces.map((dulce) => this.aProducto(dulce)),
       secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+    };
+  }
+
+  /**
+   * El servicio habla de `dulce`; aquí cada uno se traduce a `producto` (ver la
+   * cabecera de la clase). La sección se enseña como **nombre** (no como
+   * objeto), igual que en `GET /adc/productos` (N-15).
+   */
+  private aProducto(dulce: DulcePublico) {
+    return {
+      id: dulce.id,
+      nombre: dulce.nombre,
+      precio: dulce.precio,
+      moneda: dulce.moneda,
+      imagen_url: dulce.imagen_url,
+      seccion_id: dulce.seccion_id,
+      seccion: dulce.seccion?.nombre ?? null,
     };
   }
 
@@ -127,7 +137,7 @@ export class AdcController {
   async crearProducto(@Body() createDulceDto: CreateDulceDto) {
     const { mensaje, dulce } = await this.catalogo.crearDulce(createDulceDto);
 
-    return { mensaje, producto: dulce };
+    return { mensaje, producto: this.aProducto(dulce) };
   }
 
   @Roles('adc')
@@ -138,7 +148,7 @@ export class AdcController {
   ) {
     const { mensaje, dulce } = await this.catalogo.actualizarDulce(id, updateDulceDto);
 
-    return { mensaje, producto: dulce };
+    return { mensaje, producto: this.aProducto(dulce) };
   }
 
   @Roles('adc')
