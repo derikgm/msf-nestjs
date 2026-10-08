@@ -16,6 +16,9 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/delys/secciones` | público |
 | `POST` | `/delys/secciones` | `delys` o `admin`, **alta de sección** |
 | `GET` | `/adc/productos` | público, devuelve `productos` **y** `secciones` |
+| `POST` | `/adc/productos` | `adc` o `admin`, **alta en el catálogo** |
+| `PATCH` | `/adc/productos/:id` | `adc` o `admin`, **edita nombre, precio, moneda o sección** |
+| `DELETE` | `/adc/productos/:id` | `adc` o `admin`, **borra del catálogo** |
 | `POST` | `/adc/productos/:id/imagen` | `adc` o `admin`, sube la foto; la respuesta trae la clave **`producto`** (no `dulce`) |
 | `DELETE` | `/adc/productos/:id/imagen` | `adc` o `admin`, quita la foto; igual, clave **`producto`** |
 | `GET` | `/adc/secciones` | público |
@@ -39,6 +42,10 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/delys/pedidos` | `delys` o `admin` |
 | `GET` | `/delys/pedidos/:id` | `delys` o `admin` |
 | `DELETE` | `/delys/pedidos/:id` | `delys` o `admin` |
+| `POST` | `/adc/pedido` | **público** |
+| `GET` | `/adc/pedidos` | `adc` o `admin` |
+| `GET` | `/adc/pedidos/:id` | `adc` o `admin` |
+| `DELETE` | `/adc/pedidos/:id` | `adc` o `admin` |
 | `POST` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
 | `DELETE` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
 

@@ -26,7 +26,7 @@ Pendientes y cosas que hay que arreglar. Sin deadlines todavía; es una lista de
 5. **Rutas** — en `src/delys/delys.controller.ts` y `src/adc/adc.controller.ts`:
    - `GET /delys/secciones` (público, **sí** trae `dulces`), `POST /delys/secciones` (`@Roles('delys')`).
    - `GET /adc/secciones` (público, **sin** `dulces`), `POST /adc/secciones` (`@Roles('adc')`).
-   - `GET /adc/productos` → `{ productos: [...con seccion_id y seccion nombre], secciones: [{id, nombre}] }`, y **filtra** los productos de la sección `dulces` y la propia sección `dulces`.
+   - `GET /adc/productos` → `{ productos: [...con seccion_id y seccion nombre], secciones: [{id, nombre}] }`. **No filtra nada**: trae también los productos que aún estén en la sección `dulces` y la propia sección (N-15, API.md §20.4).
    - `POST/PATCH /adc/productos` / `POST/PATCH /delys/dulces` con `seccion_id` (traducen por negocio).
 6. **Migración SQL para producción** — `migraciones/003-secciones.sql` (idempotente, a prueba de orden): crea `seccion`, añade `producto.seccion_id` con FK (solo si `producto` no tiene ya una, por si `synchronize` la creó antes) y el backfill de los productos sin sección a `dulces`.
 7. **Docs** — `API.md` (tabla + sección 20 "Secciones del catálogo"), `README.md` (tabla de rutas).
@@ -75,7 +75,7 @@ Pendientes y cosas que hay que arreglar. Sin deadlines todavía; es una lista de
 
 | Lado | Tipo | Significado |
 | --- | --- | --- |
-| Backend (`src/delys/entities/dulce.entity.ts`) | `number` | Tamaño del archivo, para liberar cuota al borrar |
+| Backend (`src/common/entities/dulce.entity.ts`) | `number` | Tamaño del archivo, para liberar cuota al borrar |
 | Frontend (`dulces.modelo.ts`) | `string \| null` | La imagen entera en base64 |
 
 `resolverImagenDulce()` hace `dulce.imagen_bytes?.trim()`. Con un número ahí, `?.` no salva: solo protege `null`/`undefined`, y `(12345).trim` no existe, así que reventaría con `TypeError`.

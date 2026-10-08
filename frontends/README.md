@@ -55,4 +55,4 @@ Pendiente por decidir: las rutas de pedidos e imágenes de `DelysController` est
 
 ## Ventaja para trabajar con IA
 
-Tener la API y sus consumidores en el mismo lugar permite levantar el backend y probar de verdad el payload que genera cada frontend, en lugar de asumir el contrato. El backend tiene una prueba de contrato que replica exactamente el body que envía Delys a `POST /delys/pedido`; conviene repetirla cuando se toque cualquiera de los dos lados.
+Tener la API y sus consumidores en el mismo lugar permite levantar el backend y probar de verdad el payload que genera cada frontend, en lugar de asumir el contrato. De momento el contrato se verifica probando a mano: **no hay todavía una prueba automatizada** que replique exactamente el body que envía Delys a `POST /delys/pedido` (pendiente X-5/N-23). Conviene añadirla y repetirla cuando se toque cualquiera de los dos lados.

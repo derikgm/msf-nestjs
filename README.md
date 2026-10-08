@@ -43,7 +43,7 @@ Cada token lleva un **rol** y hay dos guards: el de autenticación (firma + que 
 
 ### El modelo de usuarios
 
-El rol **es** el proyecto: `delys`, `domus`. No hay un superusuario que vea los dos; cada usuario solo ve lo de su proyecto. La excepción es `admin`: administra la plataforma y `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin tocar los decoradores uno por uno. El aislamiento entre `delys` y `domus` no se toca.
+El rol **es** el proyecto: `delys`, `domus`. Cada usuario solo ve lo de su proyecto, salvo `admin`, que **sí ve los dos catálogos**: `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin tocar los decoradores uno por uno. El aislamiento entre `delys` y `domus` no se toca.
 
 `admin` es además el único que puede **asignar el rol** al crear un usuario: `POST /auth/admin/usuarios` recibe `rol` en el cuerpo (en `POST /auth/usuarios` ese campo se ignora, el rol sale del token).
 
@@ -87,7 +87,7 @@ rellenar. El `.env` real está en `.gitignore` y no se sube nunca.
 
 Si falta `AUTH_JWT_SECRET` la app **no arranca**: es preferible fallar al inicio que devolver 500 en la primera petición. Las variables de Supabase sí son perezosas: si faltan, solo fallan las rutas de imagen (503), el resto sigue sirviendo.
 
-En Wasmer **no subas `.env`**: define las cuatro variables como variables de entorno del despliegue.
+En Wasmer **no subas `.env`**: define las variables como variables de entorno del despliegue (la lista completa, sin secretos, está en `.env.example`).
 
 ## Imágenes de los dulces
 
