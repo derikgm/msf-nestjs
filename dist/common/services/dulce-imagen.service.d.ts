@@ -23,7 +23,7 @@ export declare class DulceImagenService {
         cuota: import("./storage-quota.service.js").ResumenCuota;
     }>;
     liberarParaBorrar(dulce: Dulce, caller: AuthUser): Promise<void>;
-    private liberarDe;
+    private soltar;
     private obtenerDulce;
     private bucketDe;
     private extensionDe;

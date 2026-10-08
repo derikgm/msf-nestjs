@@ -35,9 +35,15 @@ let StorageQuotaService = class StorageQuotaService {
     }
     async decrementarUso(rol, bytes) {
         this.comprobarBytes(bytes);
-        const registro = await this.asegurarRol(rol);
-        const restantes = Math.max(registro.bytes_usados - bytes, 0);
-        await this.quotaRepo.update({ rol }, { bytes_usados: restantes });
+        await this.asegurarRol(rol);
+        await this.quotaRepo
+            .createQueryBuilder()
+            .update(StorageQuota)
+            .set({
+            bytes_usados: () => `GREATEST(bytes_usados - ${bytes}, 0)`,
+        })
+            .where('rol = :rol', { rol })
+            .execute();
     }
     async reservarCuota(rol, bytes) {
         this.comprobarBytes(bytes);

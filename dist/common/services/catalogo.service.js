@@ -49,7 +49,13 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
                 ...dulce,
                 negocio: this.config.clave,
             }));
-            await this.dulceRepo.save(this.dulceRepo.create(semilla));
+            await this.dulceRepo
+                .createQueryBuilder()
+                .insert()
+                .into(Dulce)
+                .values(semilla)
+                .orIgnore()
+                .execute();
             this.logger.log(`Catálogo inicial cargado: ${semilla.length} ${this.config.articulo}s`);
         }
         await this.asignarSeccionDulces();

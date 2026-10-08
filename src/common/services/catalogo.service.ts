@@ -89,7 +89,19 @@ export class CatalogoService implements OnApplicationBootstrap {
         negocio: this.config.clave,
       }));
 
-      await this.dulceRepo.save(this.dulceRepo.create(semilla));
+      // N-19: `orIgnore()` es `INSERT ... ON CONFLICT DO NOTHING`. El count de
+      // arriba es solo para no intentar sembrar a cada arranque; la protección
+      // real es esta sentencia: si dos instancias arrancan a la vez y las dos
+      // ven la tabla vacía, la segunda choca contra la PK `id` y Postgres se
+      // queda con la primera (antes era un `QueryFailedError` y catálogo
+      // duplicado).
+      await this.dulceRepo
+        .createQueryBuilder()
+        .insert()
+        .into(Dulce)
+        .values(semilla)
+        .orIgnore()
+        .execute();
       this.logger.log(`Catálogo inicial cargado: ${semilla.length} ${this.config.articulo}s`);
     }
 

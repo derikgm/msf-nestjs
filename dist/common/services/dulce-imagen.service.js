@@ -56,10 +56,14 @@ let DulceImagenService = DulceImagenService_1 = class DulceImagenService {
             await this.cuota.decrementarUso(caller.rol, bytes);
             throw error;
         }
-        await this.liberarDe(dulce, caller.rol);
+        const urlAnterior = dulce.imagen_url;
+        const bytesAnteriores = dulce.imagen_bytes;
         dulce.imagen_url = this.supabase.getPublicUrl(bucket, path);
         dulce.imagen_bytes = bytes;
         const actualizado = await this.dulceRepo.save(dulce);
+        if (urlAnterior) {
+            await this.soltar(urlAnterior, bytesAnteriores, dulceId, caller.rol);
+        }
         return {
             mensaje: 'Imagen subida correctamente',
             dulce: actualizado,
@@ -72,15 +76,10 @@ let DulceImagenService = DulceImagenService_1 = class DulceImagenService {
             throw new BadRequestException(`El ${this.config.articulo} ${dulceId} no tiene imagen`);
         }
         const bytes = dulce.imagen_bytes ?? 0;
-        const bucket = this.bucketDe(caller.rol);
-        const path = this.supabase.pathDesdeUrl(bucket, dulce.imagen_url);
-        if (path)
-            await this.supabase.eliminar(bucket, [path]);
+        await this.soltar(dulce.imagen_url, bytes, dulceId, caller.rol);
         dulce.imagen_url = null;
         dulce.imagen_bytes = null;
         const actualizado = await this.dulceRepo.save(dulce);
-        if (bytes)
-            await this.cuota.decrementarUso(caller.rol, bytes);
         return {
             mensaje: 'Imagen eliminada',
             dulce: actualizado,
@@ -89,22 +88,36 @@ let DulceImagenService = DulceImagenService_1 = class DulceImagenService {
     }
     async liberarParaBorrar(dulce, caller) {
         try {
-            await this.liberarDe(dulce, caller.rol);
+            await this.soltar(dulce.imagen_url, dulce.imagen_bytes, dulce.id, caller.rol);
         }
         catch (error) {
-            this.logger.warn(`No se pudo liberar la imagen del dulce ${dulce.id}: ${error.message}. ` +
-                'El dulce se borra igual y el archivo queda pendiente de limpiar a mano.');
+            this.logger.error(`No se pudo liberar la imagen del ${this.config.articulo} ${dulce.id}: ${error.message}. ` +
+                'El archivo queda pendiente de limpiar a mano.', error.stack);
         }
     }
-    async liberarDe(dulce, rol) {
-        if (!dulce.imagen_url)
+    async soltar(imagenUrl, imagenBytes, etiqueta, rol) {
+        if (!imagenUrl)
             return;
         const bucket = this.bucketDe(rol);
-        const path = this.supabase.pathDesdeUrl(bucket, dulce.imagen_url);
-        if (path)
+        const path = this.supabase.pathDesdeUrl(bucket, imagenUrl);
+        if (!path)
+            return;
+        try {
             await this.supabase.eliminar(bucket, [path]);
-        if (dulce.imagen_bytes)
-            await this.cuota.decrementarUso(rol, dulce.imagen_bytes);
+        }
+        catch (error) {
+            this.logger.warn(`No se pudo borrar la imagen de ${etiqueta} (${path}): ${error.message}. Reintentando...`);
+            try {
+                await this.supabase.eliminar(bucket, [path]);
+            }
+            catch (segundoError) {
+                this.logger.error(`La imagen de ${etiqueta} (${path}) sigue sin borrarse tras el reintento: ` +
+                    `${segundoError.message}. El archivo queda pendiente de limpiar a mano y su cuota no se libera.`);
+                return;
+            }
+        }
+        if (imagenBytes)
+            await this.cuota.decrementarUso(rol, imagenBytes);
     }
     async obtenerDulce(id) {
         const dulce = await this.dulceRepo.findOneBy({ id, negocio: this.config.clave });
