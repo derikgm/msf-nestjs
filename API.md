@@ -790,3 +790,33 @@ curl localhost:3000/storage/quota -H "Authorization: Bearer $TOKEN"
 ```
 
 Los pasos 4 a 6 necesitan la `SUPABASE_SERVICE_ROLE_KEY` real en `.env` y el bucket `delys` creado y público en el panel de Supabase.
+
+---
+
+## Endpoints sin cliente (X-7)
+
+> **Decisión del usuario (2026-10-08): documentar, no borrar.** Todo lo de esta sección se deja
+> en el código tal cual; aquí se anota quién lo usa de verdad para que nadie lo dé por muerto ni
+> lo «arregle» quitándolo.
+>
+> Comprobado el 2026-10-08 grepeando las rutas que llaman `msf-app` (`src/lib/api`, `src/lib/*.ts`)
+> y `adc` (`src/app/services`).
+
+### Ya tienen cliente (antes aparecían como huérfanos)
+
+| Endpoint | Quién lo consume desde hoy |
+|---|---|
+| `GET /storage/quota` | pestaña **Cuenta** del panel, tarjeta de cuota de imágenes (M-11) |
+| `GET /delys/pedidos`, `GET /delys/pedidos/:id` | pestaña **Pedidos** del panel |
+| `GET /auth/usuarios`, `PATCH /auth/usuarios/:id`, `DELETE /auth/usuarios/:id`, `POST /auth/admin/usuarios` | pestaña **Usuarios** del panel, solo rol `admin` (M-5) |
+
+### Siguen sin nadie que los llame
+
+| Endpoint | Por qué se queda |
+|---|---|
+| `POST /auth/registro` | El panel da de alta con `POST /auth/admin/usuarios`. Se conserva por si se quiere registro con invitación. |
+| `POST /auth/usuarios` | Igual: alta sin token con rol restringido; el panel usa la ruta de `admin`. |
+| `GET /delys/secciones`, `POST /delys/secciones`, `PATCH\|DELETE /delys/secciones/:id` | Descartado el CRUD de secciones para Delys: «Delys solo muestra dulces» (decisión del 2026-10-07). |
+| `GET /delys/ofertas` | La vitrina de Delys está fuera del alcance por ahora. **Ojo:** si un cálculo automático vuelve a hacer esta lista, revisar antes `Delys/`, que no se ha analizado. |
+| `POST /delys/pedido` | Mismo caso: la web pública de Delys es quien podría enviarlo. No se ha revisado `Delys/` por petición del usuario. |
+| `POST /adc/pedido`, `GET /adc/pedidos`, `GET \| DELETE /adc/pedidos/:id` | La web pública de ADC no tiene formulario de pedido y el panel no tiene pestaña de pedidos (decisión del 2026-10-07: los pedidos se retoman más adelante). **Si algún día se retoman, empezar por aquí.** |
