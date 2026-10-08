@@ -10,13 +10,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, Get, HttpCode, Post, Req, UnauthorizedException, } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Req, UnauthorizedException, } from '@nestjs/common';
 import { minutes, Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
 import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto.js';
 import { ROL_SUPERUSUARIO } from './entities/index.js';
 import { Public } from './public.decorator.js';
 import { Roles } from './roles.decorator.js';
@@ -42,6 +43,15 @@ let AuthController = class AuthController {
     }
     yo(request) {
         return this.usuarioActual(request);
+    }
+    listarUsuarios() {
+        return this.authService.listarUsuarios();
+    }
+    actualizarUsuario(id, dto, request) {
+        return this.authService.actualizarUsuario(id, dto, this.usuarioActual(request));
+    }
+    eliminarUsuario(id, request) {
+        return this.authService.eliminarUsuario(id, this.usuarioActual(request));
     }
     usuarioActual(request) {
         if (!request.user)
@@ -102,6 +112,32 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "yo", null);
+__decorate([
+    Roles(ROL_SUPERUSUARIO),
+    Get('usuarios'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "listarUsuarios", null);
+__decorate([
+    Roles(ROL_SUPERUSUARIO),
+    Patch('usuarios/:id'),
+    __param(0, Param('id', new ParseUUIDPipe())),
+    __param(1, Body()),
+    __param(2, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, UpdateUsuarioDto, Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "actualizarUsuario", null);
+__decorate([
+    Roles(ROL_SUPERUSUARIO),
+    Delete('usuarios/:id'),
+    __param(0, Param('id', new ParseUUIDPipe())),
+    __param(1, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "eliminarUsuario", null);
 AuthController = __decorate([
     Controller('auth'),
     __metadata("design:paramtypes", [AuthService])

@@ -10,7 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException, } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, UnauthorizedException, } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -64,6 +64,49 @@ let AuthService = class AuthService {
             throw new ForbiddenException('Solo un administrador puede asignar roles');
         }
         return this.crear(dto, dto.rol);
+    }
+    async listarUsuarios() {
+        const usuarios = await this.usuarioRepo.find({
+            order: { creado_en: 'DESC' },
+            select: {
+                id: true,
+                nombre: true,
+                usuario: true,
+                rol: true,
+                activo: true,
+                creado_en: true,
+            },
+        });
+        return { usuarios };
+    }
+    async actualizarUsuario(id, dto, caller) {
+        if (caller.rol !== ROL_SUPERUSUARIO) {
+            throw new ForbiddenException('Solo un administrador puede gestionar usuarios');
+        }
+        const usuario = await this.buscarPorId(id);
+        if (!usuario) {
+            throw new NotFoundException('No existe el usuario ' + id);
+        }
+        if (dto.rol !== undefined) {
+            usuario.rol = dto.rol;
+        }
+        if (dto.activo !== undefined) {
+            usuario.activo = dto.activo;
+        }
+        await this.usuarioRepo.save(usuario);
+        const { password_hash, ...resto } = usuario;
+        return { mensaje: 'Usuario actualizado', usuario: resto };
+    }
+    async eliminarUsuario(id, caller) {
+        if (caller.rol !== ROL_SUPERUSUARIO) {
+            throw new ForbiddenException('Solo un administrador puede gestionar usuarios');
+        }
+        const usuario = await this.buscarPorId(id);
+        if (!usuario) {
+            throw new NotFoundException('No existe el usuario ' + id);
+        }
+        await this.usuarioRepo.delete(id);
+        return { mensaje: 'Usuario eliminado' };
     }
     async changePassword(caller, dto) {
         const usuario = await this.buscarPorId(caller.sub);

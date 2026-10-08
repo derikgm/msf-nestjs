@@ -28,6 +28,9 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `POST` | `/auth/admin/usuarios` | **solo `admin`**, crea usuarios y les asigna el rol |
 | `POST` | `/auth/cambiar-password` | cualquier rol, solo la propia contraseña |
 | `GET` | `/auth/yo` | cualquier rol |
+| `GET` | `/auth/usuarios` | **solo `admin`**, lista todos los usuarios |
+| `PATCH` | `/auth/usuarios/:id` | **solo `admin`**, cambia `rol` y/o `activo` |
+| `DELETE` | `/auth/usuarios/:id` | **solo `admin`**, borra el usuario |
 | `GET` | `/storage/quota` | cualquier rol, devuelve la cuota de su proyecto |
 | `POST` | `/delys/dulces` | `delys` o `admin`, **alta en el catálogo** |
 | `PATCH` | `/delys/dulces/:id` | `delys` o `admin`, **edita nombre, precio, moneda o sección** |
@@ -221,6 +224,73 @@ curl localhost:3000/auth/yo -H "Authorization: Bearer eyJ..."
 ```json
 { "sub": "8afce1d2-...", "usuario": "propietaria", "rol": "delys", "iat": 1790692239 }
 ```
+
+---
+
+### 7.1. `GET /auth/usuarios`
+
+Listado de usuarios para el panel de administración. **Solo `admin`** (JWT + `@Roles('admin')`); cualquier otro rol recibe `403`.
+
+```bash
+curl localhost:3000/auth/usuarios -H "Authorization: Bearer eyJ..."
+```
+
+```json
+{
+  "usuarios": [
+    {
+      "id": "8afce1d2-...",
+      "nombre": "Mari",
+      "usuario": "mari",
+      "rol": "delys",
+      "activo": true,
+      "creado_en": "2026-01-15T10:20:30.000Z"
+    }
+  ]
+}
+```
+
+Ordenado por `creado_en` de más reciente a más antiguo. **La contraseña nunca aparece** (`password_hash` es `select: false`).
+
+---
+
+### 7.2. `PATCH /auth/usuarios/:id`
+
+Cambia el rol y/o el flag `activo` de un usuario. **Solo `admin`**. El `id` debe ser un UUID (si no, `400`).
+
+```bash
+curl -X PATCH localhost:3000/auth/usuarios/8afce1d2-... \
+  -H 'content-type: application/json' -H "Authorization: Bearer eyJ..." \
+  -d '{"activo": false}'
+```
+
+```json
+{
+  "mensaje": "Usuario actualizado",
+  "usuario": { "id": "8afce1d2-...", "nombre": "Mari", "usuario": "mari", "rol": "delys", "activo": false, "creado_en": "2026-01-15T10:20:30.000Z" }
+}
+```
+
+- Los dos campos son opcionales y se pueden mandar juntos (`{"rol": "adc", "activo": true}`).
+- `rol` acepta solo los valores del enum `ROLES` (`delys`, `domus`, `adc`, `admin`); otro valor da `400`.
+- `activo: false` retira el acceso **al instante**: `JwtAuthGuard` comprueba el flag en cada petición y el siguiente intento con ese token devuelve `401`.
+- Usuario inexistente → `404`.
+
+---
+
+### 7.3. `DELETE /auth/usuarios/:id`
+
+Borra el usuario. **Solo `admin`**.
+
+```bash
+curl -X DELETE localhost:3000/auth/usuarios/8afce1d2-... -H "Authorization: Bearer eyJ..."
+```
+
+```json
+{ "mensaje": "Usuario eliminado" }
+```
+
+No hay protección contra borrarse a uno mismo ni contra dejar un rol sin usuarios: si hace falta rellenarlo, se crea otro con `POST /auth/usuarios` (o el registro inicial mientras el rol esté vacío). Usuario inexistente → `404`.
 
 ---
 

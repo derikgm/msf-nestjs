@@ -1,8 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Req,
   UnauthorizedException,
@@ -13,6 +17,7 @@ import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
 import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto.js';
 import { ROL_SUPERUSUARIO } from './entities/index.js';
 import type { RequestConUsuario } from './auth.interfaces.js';
 import { Public } from './public.decorator.js';
@@ -69,6 +74,34 @@ export class AuthController {
   @Get('yo')
   yo(@Req() request: RequestConUsuario) {
     return this.usuarioActual(request);
+  }
+
+  /** Listar todos los usuarios. Solo admin. */
+  @Roles(ROL_SUPERUSUARIO)
+  @Get('usuarios')
+  listarUsuarios() {
+    return this.authService.listarUsuarios();
+  }
+
+  /** Actualizar rol y/o estado activo de un usuario. Solo admin. */
+  @Roles(ROL_SUPERUSUARIO)
+  @Patch('usuarios/:id')
+  actualizarUsuario(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateUsuarioDto,
+    @Req() request: RequestConUsuario,
+  ) {
+    return this.authService.actualizarUsuario(id, dto, this.usuarioActual(request));
+  }
+
+  /** Eliminar un usuario. Solo admin. */
+  @Roles(ROL_SUPERUSUARIO)
+  @Delete('usuarios/:id')
+  eliminarUsuario(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() request: RequestConUsuario,
+  ) {
+    return this.authService.eliminarUsuario(id, this.usuarioActual(request));
   }
 
   /** El JwtAuthGuard ya bloquea las peticiones sin token, esto es solo un seguro. */
