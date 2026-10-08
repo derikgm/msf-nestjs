@@ -10,7 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Req, UploadedFile, UseInterceptors, } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Query, Req, UploadedFile, UseInterceptors, } from '@nestjs/common';
 import { minutes, SkipThrottle, Throttle } from '@nestjs/throttler';
 import { interceptorDeImagen } from '../common/uploads/imagen.archivo.js';
 import { usuarioActual } from '../common/utils/auth.util.js';
@@ -88,8 +88,8 @@ let AdcController = class AdcController {
     agregarPedido(createPedidoDto) {
         return this.catalogo.crearPedido(createPedidoDto);
     }
-    obtenerPedidos() {
-        return this.catalogo.obtenerTodosPedidos();
+    obtenerPedidos(pagina, limite) {
+        return this.catalogo.obtenerTodosPedidos({ pagina, limite });
     }
     obtenerPedido(id) {
         return this.catalogo.obtenerPedido(id);
@@ -197,8 +197,10 @@ __decorate([
 __decorate([
     Roles('adc'),
     Get('pedidos'),
+    __param(0, Query('pagina', new ParseIntPipe({ optional: true }))),
+    __param(1, Query('limite', new ParseIntPipe({ optional: true }))),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Number, Number]),
     __metadata("design:returntype", void 0)
 ], AdcController.prototype, "obtenerPedidos", null);
 __decorate([

@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseInterceptors,
@@ -39,8 +40,12 @@ export class DelysController {
   @Public()
   @SkipThrottle()
   @Get('dulces')
-  obtenerDulces() {
-    return this.catalogo.obtenerTodosDulces();
+  obtenerDulces(
+    @Query('pagina', new ParseIntPipe({ optional: true })) pagina?: number,
+    @Query('limite', new ParseIntPipe({ optional: true })) limite?: number,
+  ) {
+    // N-11: la paginación es opcional y solo corta si llegan los dos parámetros.
+    return this.catalogo.obtenerTodosDulces({ pagina, limite });
   }
 
   @Public()
@@ -137,8 +142,11 @@ export class DelysController {
 
   @Roles('delys')
   @Get('pedidos')
-  obtenerPedidos() {
-    return this.catalogo.obtenerTodosPedidos();
+  obtenerPedidos(
+    @Query('pagina', new ParseIntPipe({ optional: true })) pagina?: number,
+    @Query('limite', new ParseIntPipe({ optional: true })) limite?: number,
+  ) {
+    return this.catalogo.obtenerTodosPedidos({ pagina, limite });
   }
 
   @Roles('delys')

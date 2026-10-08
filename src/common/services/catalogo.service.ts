@@ -14,7 +14,7 @@ import { CreatePedidoDto } from '../dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../dto/create-dulce.dto.js';
 import { UpdateDulceDto } from '../dto/update-dulce.dto.js';
 import { Dulce, Encargo, Pedido, Seccion } from '../entities/index.js';
-import type { DulcePublico } from '../interfaces/catalogo.interfaces.js';
+import type { DulcePublico, Paginacion } from '../interfaces/catalogo.interfaces.js';
 import { ofertas } from '../data/ofertas.js';
 import { NEGOCIO, type NegocioConfig } from '../config/negocio.config.js';
 import { DulceImagenService } from './dulce-imagen.service.js';
@@ -309,16 +309,30 @@ export class CatalogoService implements OnApplicationBootstrap {
     return { ok: true, pedido: await this.obtenerPedido(pedido.id) };
   }
 
-  async obtenerTodosDulces() {
+  async obtenerTodosDulces(paginacion?: Paginacion) {
     const dulces = await this.dulceRepo.find({
       where: { negocio: this.config.clave },
       relations: { seccion: true },
       order: { id: 'ASC' },
+      ...this.recorte(paginacion),
     });
 
     // N-15: solo los campos públicos. `imagen_bytes` (contador de la cuota de
     // Storage) y `negocio` (filtro del servidor) no salen en el GET.
     return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+  }
+
+  /**
+   * N-11: `skip`/`take` solo cuando el cliente pidió `pagina` y `limite`
+   * válidos. Sin ellos se devuelve todo: las vitrinas pintan el catálogo
+   * entero y romperían si de pronto la respuesta viniera cortada.
+   */
+  private recorte(paginacion?: Paginacion): { skip?: number; take?: number } {
+    const { pagina, limite } = paginacion ?? {};
+
+    if (!pagina || !limite || pagina < 1 || limite < 1) return {};
+
+    return { skip: (pagina - 1) * limite, take: limite };
   }
 
   /**
@@ -502,8 +516,12 @@ export class CatalogoService implements OnApplicationBootstrap {
     );
   }
 
-  async obtenerTodosPedidos() {
-    const pedidos = await this.pedidoRepo.find({ where: { negocio: this.config.clave }, relations });
+  async obtenerTodosPedidos(paginacion?: Paginacion) {
+    const pedidos = await this.pedidoRepo.find({
+      where: { negocio: this.config.clave },
+      relations,
+      ...this.recorte(paginacion),
+    });
 
     return { pedidos };
   }

@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseInterceptors,
@@ -215,8 +216,11 @@ export class AdcController {
 
   @Roles('adc')
   @Get('pedidos')
-  obtenerPedidos() {
-    return this.catalogo.obtenerTodosPedidos();
+  obtenerPedidos(
+    @Query('pagina', new ParseIntPipe({ optional: true })) pagina?: number,
+    @Query('limite', new ParseIntPipe({ optional: true })) limite?: number,
+  ) {
+    return this.catalogo.obtenerTodosPedidos({ pagina, limite });
   }
 
   @Roles('adc')

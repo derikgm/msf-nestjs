@@ -9,7 +9,7 @@ export declare class DelysController {
     private readonly catalogo;
     private readonly imagenService;
     constructor(catalogo: CatalogoService, imagenService: DulceImagenService);
-    obtenerDulces(): Promise<{
+    obtenerDulces(pagina?: number, limite?: number): Promise<{
         dulces: import("../common/interfaces/catalogo.interfaces.js").DulcePublico[];
     }>;
     obtenerOfertas(): Promise<{
@@ -53,7 +53,7 @@ export declare class DelysController {
         ok: boolean;
         pedido: import("../common/entities/pedido.entity.js").Pedido;
     }>;
-    obtenerPedidos(): Promise<{
+    obtenerPedidos(pagina?: number, limite?: number): Promise<{
         pedidos: import("../common/entities/pedido.entity.js").Pedido[];
     }>;
     findOne(id: string): Promise<import("../common/entities/pedido.entity.js").Pedido>;

@@ -48,6 +48,19 @@ export interface Encargo {
 }
 
 /**
+ * Paginación opcional de los GET de catálogo (N-11). Solo corta cuando el
+ * cliente manda los dos parámetros válidos; sin ellos (o con uno solo) se
+ * devuelve **todo**, porque las vitrinas pintan el catálogo entero y no deben
+ * verse truncadas por defecto.
+ */
+export interface Paginacion {
+    /** Página a partir de 1 (la primera es `pagina = 1`). */
+    pagina?: number,
+    /** Tamaño de página, 1 o más. */
+    limite?: number,
+}
+
+/**
  * Un dulce tal como se enseña en la API (N-15): los campos públicos, sin
  * `imagen_bytes` (contador interno de la cuota de Storage, no le dice nada al
  * cliente) ni `negocio` (columna que sirve para filtrar, no para mostrar).

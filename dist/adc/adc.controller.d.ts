@@ -83,7 +83,7 @@ export declare class AdcController {
         ok: boolean;
         pedido: import("../common/entities/pedido.entity.js").Pedido;
     }>;
-    obtenerPedidos(): Promise<{
+    obtenerPedidos(pagina?: number, limite?: number): Promise<{
         pedidos: import("../common/entities/pedido.entity.js").Pedido[];
     }>;
     obtenerPedido(id: string): Promise<import("../common/entities/pedido.entity.js").Pedido>;

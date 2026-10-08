@@ -21,6 +21,10 @@ export interface Encargo {
     dulce: Dulce;
     cantidad: number;
 }
+export interface Paginacion {
+    pagina?: number;
+    limite?: number;
+}
 export interface DulcePublico {
     id: number;
     nombre: string;

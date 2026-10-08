@@ -161,13 +161,20 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         }));
         return { ok: true, pedido: await this.obtenerPedido(pedido.id) };
     }
-    async obtenerTodosDulces() {
+    async obtenerTodosDulces(paginacion) {
         const dulces = await this.dulceRepo.find({
             where: { negocio: this.config.clave },
             relations: { seccion: true },
             order: { id: 'ASC' },
+            ...this.recorte(paginacion),
         });
         return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+    }
+    recorte(paginacion) {
+        const { pagina, limite } = paginacion ?? {};
+        if (!pagina || !limite || pagina < 1 || limite < 1)
+            return {};
+        return { skip: (pagina - 1) * limite, take: limite };
     }
     proyectar(dulce) {
         return {
@@ -272,8 +279,12 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         return (`"${nombre}" está en ${pedidos} ${plural} sin resolver. ` +
             'Márcalo como hecho o cancélalo en Pedidos, y ya lo podrás borrar.');
     }
-    async obtenerTodosPedidos() {
-        const pedidos = await this.pedidoRepo.find({ where: { negocio: this.config.clave }, relations });
+    async obtenerTodosPedidos(paginacion) {
+        const pedidos = await this.pedidoRepo.find({
+            where: { negocio: this.config.clave },
+            relations,
+            ...this.recorte(paginacion),
+        });
         return { pedidos };
     }
     async obtenerPedido(id) {
