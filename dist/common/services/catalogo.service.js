@@ -289,8 +289,21 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         await this.pedidoRepo.remove(pedido);
         return { ok: true };
     }
-    obtenerOfertas() {
-        return { ofertas };
+    async obtenerOfertas() {
+        const ids = ofertas.map((oferta) => oferta.id);
+        const dulces = await this.dulceRepo.find({
+            where: { negocio: this.config.clave, id: In(ids) },
+            order: { id: 'ASC' },
+        });
+        return {
+            ofertas: dulces.map((dulce) => ({
+                id: dulce.id,
+                nombre: dulce.nombre,
+                precio: dulce.precio,
+                imagen_url: dulce.imagen_url,
+                moneda: dulce.moneda,
+            })),
+        };
     }
     async dulcesDelCatalogo(ids) {
         const encontrados = await this.dulceRepo.findBy({ id: In(ids), negocio: this.config.clave });

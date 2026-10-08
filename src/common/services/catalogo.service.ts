@@ -526,9 +526,31 @@ export class CatalogoService implements OnApplicationBootstrap {
     return { ok: true };
   }
 
-  //Seccion de ofertas:
-  obtenerOfertas() {
-    return { ofertas };
+  /**
+   * Las ofertas de la pastelería: los productos con los que nació el catálogo
+   * (los ids de `data/ofertas.ts`), leídos **de la tabla** y no del archivo
+   * estático (N-13): si el precio cambió en el catálogo, la oferta enseña el
+   * precio nuevo. Sin token (lo consume la vitrina).
+   */
+  async obtenerOfertas() {
+    const ids = ofertas.map((oferta) => oferta.id);
+
+    const dulces = await this.dulceRepo.find({
+      where: { negocio: this.config.clave, id: In(ids) },
+      order: { id: 'ASC' },
+    });
+
+    // Misma forma que en API.md (§10). Si un dulce de la semilla se borró, su
+    // oferta simplemente deja de salir.
+    return {
+      ofertas: dulces.map((dulce) => ({
+        id: dulce.id,
+        nombre: dulce.nombre,
+        precio: dulce.precio,
+        imagen_url: dulce.imagen_url,
+        moneda: dulce.moneda,
+      })),
+    };
   }
 
   /**

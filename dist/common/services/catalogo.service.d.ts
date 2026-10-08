@@ -65,8 +65,14 @@ export declare class CatalogoService implements OnApplicationBootstrap {
     remove(id: string): Promise<{
         ok: boolean;
     }>;
-    obtenerOfertas(): {
-        ofertas: import("../interfaces/catalogo.interfaces.js").Dulce[];
-    };
+    obtenerOfertas(): Promise<{
+        ofertas: {
+            id: number;
+            nombre: string;
+            precio: number;
+            imagen_url: string | null;
+            moneda: string;
+        }[];
+    }>;
     private dulcesDelCatalogo;
 }

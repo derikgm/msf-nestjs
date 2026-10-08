@@ -12,9 +12,15 @@ export declare class DelysController {
     obtenerDulces(): Promise<{
         dulces: import("../common/interfaces/catalogo.interfaces.js").DulcePublico[];
     }>;
-    obtenerOfertas(): {
-        ofertas: import("../common/interfaces/catalogo.interfaces.js").Dulce[];
-    };
+    obtenerOfertas(): Promise<{
+        ofertas: {
+            id: number;
+            nombre: string;
+            precio: number;
+            imagen_url: string | null;
+            moneda: string;
+        }[];
+    }>;
     obtenerSecciones(): Promise<{
         secciones: import("../common/entities/seccion.entity.js").Seccion[];
     }>;
