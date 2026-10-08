@@ -46,15 +46,19 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 
 Las rutas públicas son las que puede usar alguien sin cuenta: mirar el catálogo y **enviar un pedido**. El cliente de la pastelería no tiene credenciales, así que el alta de pedidos no lleva token. El resto de rutas de pedidos (`GET`/`DELETE`) sí lo exigen, porque son las del panel.
 
-Formato de errores, siempre el mismo:
+Formato de errores, siempre el mismo (N-18, filtro global `HttpErrorFilter`):
 
 ```json
-{ "message": "No existe el dulce 99", "error": "Bad Request", "statusCode": 400 }
+{ "statusCode": 400, "mensaje": "No existe el dulce 99" }
 ```
+
+En los `400` de validación `mensaje` es un **array** de motivos (uno por regla
+rota). Para los clientes que aún leían el antiguo `message` de Nest, el campo
+`message` viaja igual en `mensaje` (el panel lo entiende desde N-18).
 
 Códigos usados: `400` datos inválidos o cuota insuficiente, `401` sin token / token caducado / contraseña incorrecta / usuario desactivado, `403` rol que no es el del proyecto, `404` recurso inexistente, `409` `usuario` repetido, `429` demasiadas peticiones (más abajo), `503` falta la configuración de Supabase **o** la base de datos no respondió.
 
-Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"message": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos. **Los GET públicos de catálogo están exentos** (`@SkipThrottle()`): `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /adc/productos` y `GET /adc/secciones` no devuelven nunca `429`.
+Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"mensaje": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos. **Los GET públicos de catálogo están exentos** (`@SkipThrottle()`): `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /adc/productos` y `GET /adc/secciones` no devuelven nunca `429`.
 
 Los cuatro fallos del guard tienen mensajes distintos, para que el cliente sepa si tiene que iniciar sesión otra vez o solo reintentar:
 
@@ -523,8 +527,7 @@ Ejemplo del `400` por cuota:
 
 ```json
 {
-  "message": "La cuota de \"delys\" no alcanza para esta imagen: usa 0 de 50 bytes (50 disponibles) y la imagen pesa 70 bytes",
-  "error": "Bad Request",
+  "mensaje": "La cuota de \"delys\" no alcanza para esta imagen: usa 0 de 50 bytes (50 disponibles) y la imagen pesa 70 bytes",
   "statusCode": 400
 }
 ```

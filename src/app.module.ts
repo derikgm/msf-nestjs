@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
+import { HttpErrorFilter } from './common/filters/http-error.filter.js';
 import { DelysModule } from './delys/delys.module.js';
 import { AdcModule } from './adc/adc.module.js';
 import { ControlModule } from './control/control.module.js';
@@ -78,6 +79,11 @@ import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
     StorageQuotaModule,
   ],
   controllers: [],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // N-18: cada excepción se loguea con Logger y la respuesta de error es
+    // siempre { statusCode, mensaje }. Ver src/common/filters/http-error.filter.ts.
+    { provide: APP_FILTER, useClass: HttpErrorFilter },
+  ],
 })
 export class AppModule {}

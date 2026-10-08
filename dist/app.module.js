@@ -5,8 +5,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
+import { HttpErrorFilter } from './common/filters/http-error.filter.js';
 import { DelysModule } from './delys/delys.module.js';
 import { AdcModule } from './adc/adc.module.js';
 import { ControlModule } from './control/control.module.js';
@@ -57,7 +58,10 @@ AppModule = __decorate([
             StorageQuotaModule,
         ],
         controllers: [],
-        providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+        providers: [
+            { provide: APP_GUARD, useClass: ThrottlerGuard },
+            { provide: APP_FILTER, useClass: HttpErrorFilter },
+        ],
     })
 ], AppModule);
 export { AppModule };
