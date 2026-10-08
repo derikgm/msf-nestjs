@@ -12,7 +12,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 };
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Req, UploadedFile, UseInterceptors, } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { minutes, Throttle } from '@nestjs/throttler';
+import { minutes, SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
@@ -103,6 +103,7 @@ let AdcController = class AdcController {
 };
 __decorate([
     Public(),
+    SkipThrottle(),
     Get('productos'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
@@ -110,6 +111,7 @@ __decorate([
 ], AdcController.prototype, "obtenerProductos", null);
 __decorate([
     Public(),
+    SkipThrottle(),
     Get('secciones'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),

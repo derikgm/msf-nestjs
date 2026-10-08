@@ -25,7 +25,10 @@ import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
      * Ojo con dos cosas: el `ttl` va en **milisegundos** (de ahí el helper
      * `minutes()`), y el guard se registra globalmente con `APP_GUARD`, así
      * que `@SkipThrottle()` es la vía de escape si alguna ruta llegara a
-     * necesitarlo.
+     * necesitarlo. Hoy lo usan los GET públicos de catálogo (Delys y ADC):
+     * la vitrina los pinta enteros en cada visita y un 429 se leería como
+     * «la web está caída», no como abuso. El abuso se acota en las cuatro
+     * POST que se fuerzan sin cuenta.
      */
     ThrottlerModule.forRoot({
       throttlers: [

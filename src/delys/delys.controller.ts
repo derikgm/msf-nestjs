@@ -14,7 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { minutes, Throttle } from '@nestjs/throttler';
+import { minutes, SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
@@ -37,14 +37,18 @@ export class DelysController {
     private readonly imagenService: DulceImagenService,
   ) {}
 
-  // Catálogo: público, sin token.
+  // Catálogo: público, sin token. Los GET públicos están fuera del rate limit
+  // (N-5): la vitrina recorre catálogo, secciones e imágenes en cada visita y un
+  // 429 se vería como un fallo de la web, no como un abuso.
   @Public()
+  @SkipThrottle()
   @Get('dulces')
   obtenerDulces() {
     return this.catalogo.obtenerTodosDulces();
   }
 
   @Public()
+  @SkipThrottle()
   @Get('ofertas')
   obtenerOfertas() {
     return this.catalogo.obtenerOfertas();
@@ -55,6 +59,7 @@ export class DelysController {
   // de Delys (los productos viejos se migran ahí), así que esconderla rompería
   // la vitrina. En ADC se hace al revés (ver `AdcController`).
   @Public()
+  @SkipThrottle()
   @Get('secciones')
   obtenerSecciones() {
     return this.catalogo.listarSecciones();

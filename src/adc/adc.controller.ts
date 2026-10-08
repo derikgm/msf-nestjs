@@ -14,7 +14,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { minutes, Throttle } from '@nestjs/throttler';
+import { minutes, SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
@@ -63,7 +63,11 @@ export class AdcController {
   // conseguía esconder productos legítimos de ADC, los que se dan de alta sin
   // sección y acaban en esa sección por defecto (punto 2: con 4 creados solo se
   // veían 3). Ahora salen todos, y el panel permite reubicarlos.
+  //
+  // N-5: fuera del rate limit, igual que en Delys —un catálogo que se pinta
+  // entero en cada visita no debe acabar en 429.
   @Public()
+  @SkipThrottle()
   @Get('productos')
   async obtenerProductos() {
     const { dulces } = await this.catalogo.obtenerTodosDulces();
@@ -85,6 +89,7 @@ export class AdcController {
 
   // Secciones de ADC: lectura pública para la vitrina y gestión desde el panel.
   @Public()
+  @SkipThrottle()
   @Get('secciones')
   async obtenerSecciones() {
     const { secciones } = await this.catalogo.listarSecciones();

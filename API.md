@@ -51,7 +51,7 @@ Formato de errores, siempre el mismo:
 
 Códigos usados: `400` datos inválidos o cuota insuficiente, `401` sin token / token caducado / contraseña incorrecta / usuario desactivado, `403` rol que no es el del proyecto, `404` recurso inexistente, `409` `usuario` repetido, `429` demasiadas peticiones (más abajo), `503` falta la configuración de Supabase **o** la base de datos no respondió.
 
-Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"message": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos.
+Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"message": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos. **Los GET públicos de catálogo están exentos** (`@SkipThrottle()`): `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /adc/productos` y `GET /adc/secciones` no devuelven nunca `429`.
 
 Los cuatro fallos del guard tienen mensajes distintos, para que el cliente sepa si tiene que iniciar sesión otra vez o solo reintentar:
 
