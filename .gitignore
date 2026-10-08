@@ -1,5 +1,4 @@
 node_modules/
-package-lock.json
 .env
 
 # Caché incremental de tsc. Son dos nombres distintos: "tsbuildinfo" lo escribe
