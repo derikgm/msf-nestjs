@@ -73,5 +73,4 @@ export declare class AdcController {
     borrarPedido(id: string): Promise<{
         ok: boolean;
     }>;
-    private usuarioActual;
 }

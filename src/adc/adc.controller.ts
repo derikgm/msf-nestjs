@@ -13,22 +13,18 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { minutes, SkipThrottle, Throttle } from '@nestjs/throttler';
+import { interceptorDeImagen } from '../common/uploads/imagen.archivo.js';
+import { usuarioActual } from '../common/utils/auth.util.js';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
-import type { AuthUser, RequestConUsuario } from '../auth/auth.interfaces.js';
+import type { RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
-
-/** Mismo tope y mismos tipos que en Delys: es el mismo Storage y el mismo plan. */
-const TAMANO_MAXIMO_ARCHIVO = 50 * 1024 * 1024;
-
-const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 /**
  * Rutas de ADC: los propios endpoints de su negocio.
@@ -151,7 +147,7 @@ export class AdcController {
     @Param('id', new ParseIntPipe()) id: number,
     @Req() request: RequestConUsuario,
   ) {
-    return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
+    return this.catalogo.eliminarDulce(id, usuarioActual(request));
   }
 
   // Imágenes: multipart/form-data con el archivo en el campo "imagen". La cuota
@@ -159,23 +155,7 @@ export class AdcController {
   // `negocio`, para que un token de ADC no toque las fotos de Delys.
   @Roles('adc')
   @Post('productos/:id/imagen')
-  @UseInterceptors(
-    FileInterceptor('imagen', {
-      limits: { fileSize: TAMANO_MAXIMO_ARCHIVO, files: 1 },
-      fileFilter: (_req, file, callback) => {
-        if (!TIPOS_PERMITIDOS.includes(file.mimetype)) {
-          return callback(
-            new BadRequestException(
-              `Tipo de archivo no permitido: ${file.mimetype}. Usa ${TIPOS_PERMITIDOS.join(', ')}`,
-            ),
-            false,
-          );
-        }
-
-        return callback(null, true);
-      },
-    }),
-  )
+  @UseInterceptors(interceptorDeImagen('imagen'))
   async subirImagen(
     @Param('id', new ParseIntPipe()) id: number,
     @UploadedFile() file: MulterFile | undefined,
@@ -190,7 +170,7 @@ export class AdcController {
     const { mensaje, dulce, cuota } = await this.imagenService.subir(
       id,
       file,
-      this.usuarioActual(request),
+      usuarioActual(request),
     );
 
     // El servicio se llama `dulce` por Delys; aquí se traduce como en el resto
@@ -207,7 +187,7 @@ export class AdcController {
   ) {
     const { mensaje, dulce, cuota } = await this.imagenService.eliminar(
       id,
-      this.usuarioActual(request),
+      usuarioActual(request),
     );
 
     return { mensaje, producto: dulce, cuota };
@@ -239,12 +219,5 @@ export class AdcController {
   @Delete('pedidos/:id')
   borrarPedido(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.catalogo.remove(id);
-  }
-
-  /** El JwtAuthGuard ya bloquea sin token; esto solo evita el undefined si se reutiliza. */
-  private usuarioActual(request: RequestConUsuario): AuthUser {
-    if (!request.user) throw new BadRequestException('Petición sin usuario autenticado');
-
-    return request.user;
   }
 }

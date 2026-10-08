@@ -10,20 +10,16 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Controller, Get, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Req } from '@nestjs/common';
 import { StorageQuotaService } from '../../services/storage-quota.service.js';
+import { usuarioActual } from '../../utils/auth.util.js';
 let StorageQuotaController = class StorageQuotaController {
     quotaService;
     constructor(quotaService) {
         this.quotaService = quotaService;
     }
     getQuota(request) {
-        return this.quotaService.getResumen(this.usuarioActual(request).rol);
-    }
-    usuarioActual(request) {
-        if (!request.user)
-            throw new UnauthorizedException();
-        return request.user;
+        return this.quotaService.getResumen(usuarioActual(request).rol);
     }
 };
 __decorate([

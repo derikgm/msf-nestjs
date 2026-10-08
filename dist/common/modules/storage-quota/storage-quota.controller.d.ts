@@ -4,5 +4,4 @@ export declare class StorageQuotaController {
     private readonly quotaService;
     constructor(quotaService: StorageQuotaService);
     getQuota(request: RequestConUsuario): Promise<import("../../services/storage-quota.service.js").ResumenCuota>;
-    private usuarioActual;
 }

@@ -10,7 +10,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Req, UnauthorizedException, } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Req, } from '@nestjs/common';
 import { minutes, Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
@@ -21,6 +21,7 @@ import { UpdateUsuarioDto } from './dto/update-usuario.dto.js';
 import { ROL_SUPERUSUARIO } from './entities/index.js';
 import { Public } from './public.decorator.js';
 import { Roles } from './roles.decorator.js';
+import { usuarioActual } from '../common/utils/auth.util.js';
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
@@ -33,30 +34,25 @@ let AuthController = class AuthController {
         return this.authService.register(dto, request.user);
     }
     crearUsuario(dto, request) {
-        return this.authService.crearUsuario(dto, this.usuarioActual(request));
+        return this.authService.crearUsuario(dto, usuarioActual(request));
     }
     crearUsuarioAdmin(dto, request) {
-        return this.authService.crearUsuarioAdmin(dto, this.usuarioActual(request));
+        return this.authService.crearUsuarioAdmin(dto, usuarioActual(request));
     }
     changePassword(dto, request) {
-        return this.authService.changePassword(this.usuarioActual(request), dto);
+        return this.authService.changePassword(usuarioActual(request), dto);
     }
     yo(request) {
-        return this.usuarioActual(request);
+        return usuarioActual(request);
     }
     listarUsuarios() {
         return this.authService.listarUsuarios();
     }
     actualizarUsuario(id, dto, request) {
-        return this.authService.actualizarUsuario(id, dto, this.usuarioActual(request));
+        return this.authService.actualizarUsuario(id, dto, usuarioActual(request));
     }
     eliminarUsuario(id, request) {
-        return this.authService.eliminarUsuario(id, this.usuarioActual(request));
-    }
-    usuarioActual(request) {
-        if (!request.user)
-            throw new UnauthorizedException();
-        return request.user;
+        return this.authService.eliminarUsuario(id, usuarioActual(request));
     }
 };
 __decorate([

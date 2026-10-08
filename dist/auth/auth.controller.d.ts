@@ -61,5 +61,4 @@ export declare class AuthController {
     eliminarUsuario(id: string, request: RequestConUsuario): Promise<{
         mensaje: string;
     }>;
-    private usuarioActual;
 }

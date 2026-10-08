@@ -11,8 +11,9 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, ParseUUIDPipe, Patch, Post, Req, UploadedFile, UseInterceptors, } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { minutes, SkipThrottle, Throttle } from '@nestjs/throttler';
+import { interceptorDeImagen } from '../common/uploads/imagen.archivo.js';
+import { usuarioActual } from '../common/utils/auth.util.js';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
@@ -21,8 +22,6 @@ import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
-const TAMANO_MAXIMO_ARCHIVO = 50 * 1024 * 1024;
-const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 let DelysController = class DelysController {
     catalogo;
     imagenService;
@@ -49,16 +48,16 @@ let DelysController = class DelysController {
         return this.catalogo.actualizarDulce(id, updateDulceDto);
     }
     eliminarDulce(id, request) {
-        return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
+        return this.catalogo.eliminarDulce(id, usuarioActual(request));
     }
     subirImagen(id, file, request) {
         if (!file) {
             throw new BadRequestException('Falta el archivo. Envíalo como multipart/form-data en el campo "imagen"');
         }
-        return this.imagenService.subir(id, file, this.usuarioActual(request));
+        return this.imagenService.subir(id, file, usuarioActual(request));
     }
     eliminarImagen(id, request) {
-        return this.imagenService.eliminar(id, this.usuarioActual(request));
+        return this.imagenService.eliminar(id, usuarioActual(request));
     }
     agregarPedido(createPedidoDto) {
         return this.catalogo.crearPedido(createPedidoDto);
@@ -71,11 +70,6 @@ let DelysController = class DelysController {
     }
     remove(id) {
         return this.catalogo.remove(id);
-    }
-    usuarioActual(request) {
-        if (!request.user)
-            throw new BadRequestException('Petición sin usuario autenticado');
-        return request.user;
     }
 };
 __decorate([
@@ -139,15 +133,7 @@ __decorate([
 __decorate([
     Roles('delys'),
     Post('dulces/:id/imagen'),
-    UseInterceptors(FileInterceptor('imagen', {
-        limits: { fileSize: TAMANO_MAXIMO_ARCHIVO, files: 1 },
-        fileFilter: (_req, file, callback) => {
-            if (!TIPOS_PERMITIDOS.includes(file.mimetype)) {
-                return callback(new BadRequestException(`Tipo de archivo no permitido: ${file.mimetype}. Usa ${TIPOS_PERMITIDOS.join(', ')}`), false);
-            }
-            return callback(null, true);
-        },
-    })),
+    UseInterceptors(interceptorDeImagen('imagen')),
     __param(0, Param('id', new ParseIntPipe())),
     __param(1, UploadedFile()),
     __param(2, Req()),

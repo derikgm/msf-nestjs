@@ -9,7 +9,6 @@ import {
   Patch,
   Post,
   Req,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { minutes, Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service.js';
@@ -22,6 +21,7 @@ import { ROL_SUPERUSUARIO } from './entities/index.js';
 import type { RequestConUsuario } from './auth.interfaces.js';
 import { Public } from './public.decorator.js';
 import { Roles } from './roles.decorator.js';
+import { usuarioActual } from '../common/utils/auth.util.js';
 
 @Controller('auth')
 export class AuthController {
@@ -52,7 +52,7 @@ export class AuthController {
   /** Alta desde dentro: crea un usuario del mismo rol que quien hace la petición. */
   @Post('usuarios')
   crearUsuario(@Body() dto: CreateUsuarioDto, @Req() request: RequestConUsuario) {
-    return this.authService.crearUsuario(dto, this.usuarioActual(request));
+    return this.authService.crearUsuario(dto, usuarioActual(request));
   }
 
   /**
@@ -62,18 +62,18 @@ export class AuthController {
   @Roles(ROL_SUPERUSUARIO)
   @Post('admin/usuarios')
   crearUsuarioAdmin(@Body() dto: CreateUsuarioAdminDto, @Req() request: RequestConUsuario) {
-    return this.authService.crearUsuarioAdmin(dto, this.usuarioActual(request));
+    return this.authService.crearUsuarioAdmin(dto, usuarioActual(request));
   }
 
   @Post('cambiar-password')
   @HttpCode(200)
   changePassword(@Body() dto: ChangePasswordDto, @Req() request: RequestConUsuario) {
-    return this.authService.changePassword(this.usuarioActual(request), dto);
+    return this.authService.changePassword(usuarioActual(request), dto);
   }
 
   @Get('yo')
   yo(@Req() request: RequestConUsuario) {
-    return this.usuarioActual(request);
+    return usuarioActual(request);
   }
 
   /** Listar todos los usuarios. Solo admin. */
@@ -91,7 +91,7 @@ export class AuthController {
     @Body() dto: UpdateUsuarioDto,
     @Req() request: RequestConUsuario,
   ) {
-    return this.authService.actualizarUsuario(id, dto, this.usuarioActual(request));
+    return this.authService.actualizarUsuario(id, dto, usuarioActual(request));
   }
 
   /** Eliminar un usuario. Solo admin. */
@@ -101,13 +101,6 @@ export class AuthController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Req() request: RequestConUsuario,
   ) {
-    return this.authService.eliminarUsuario(id, this.usuarioActual(request));
-  }
-
-  /** El JwtAuthGuard ya bloquea las peticiones sin token, esto es solo un seguro. */
-  private usuarioActual(request: RequestConUsuario) {
-    if (!request.user) throw new UnauthorizedException();
-
-    return request.user;
+    return this.authService.eliminarUsuario(id, usuarioActual(request));
   }
 }

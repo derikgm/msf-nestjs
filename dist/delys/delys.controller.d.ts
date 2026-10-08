@@ -54,5 +54,4 @@ export declare class DelysController {
     remove(id: string): Promise<{
         ok: boolean;
     }>;
-    private usuarioActual;
 }
