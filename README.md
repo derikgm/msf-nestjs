@@ -71,7 +71,9 @@ Enviar `rol` en el body de `/auth/usuarios` no sirve de nada: se ignora y se usa
 
 La contraseña se compara con `scrypt` + `timingSafeEqual` (`src/auth/password.util.ts`), sin dependencias nativas, contra el hash de la fila de `usuario`. El login siempre calcula un hash aunque el usuario no exista, para que el tiempo de respuesta no delate qué usuarios existen.
 
-Variables de entorno (`.env`):
+Variables de entorno (`.env`). La lista completa de claves, con valores de
+ejemplo y sin secretos, está en **`.env.example`**: `cp .env.example .env` y
+rellenar. El `.env` real está en `.gitignore` y no se sube nunca.
 
 | Variable | Para qué sirve |
 | --- | --- |
