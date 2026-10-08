@@ -11,6 +11,28 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
 
+/**
+ * N-6: opciones SSL de la conexión a Postgres.
+ *
+ * - `DB_SSL=false` → sin TLS (Postgres local sin certificados).
+ * - `DB_CA_CERT` con el pem de la CA (escrito en una línea, con `\n` literal)
+ *   → `rejectUnauthorized: true`: solo se acepta un certificado firmado por
+ *   esa CA. Si la CA no se puede comprobar, la conexión falla en vez de
+ *   validar a ciegas.
+ * - ninguna de las dos → el comportamiento de siempre
+ *   (`rejectUnauthorized: false`), que es el del despliegue actual en Wasmer
+ *   contra Supabase: sin verificación de la CA no se rompe ese despliegue.
+ */
+function opcionesSsl(configService: ConfigService) {
+  if (configService.get<string>('DB_SSL') === 'false') return false;
+
+  const ca = configService.get<string>('DB_CA_CERT')?.replace(/\\n/g, '\n');
+
+  return ca
+    ? { rejectUnauthorized: true, ca }
+    : { rejectUnauthorized: false };
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -61,13 +83,11 @@ import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
         migrations: [Inicial1791390744944],
         migrationsTableName: 'migrations',
         migrationsRun: true,
-        // Supabase exige SSL; el Postgres local no lo trae. En local se apaga
-        // poniendo DB_SSL=false; si no se define, se asume SSL (comportamiento
-        // original, el que usa el despliegue en Wasmer contra Supabase).
-        ssl:
-          configService.get<string>('DB_SSL') === 'false'
-            ? false
-            : { rejectUnauthorized: false },
+        // N-6: la verificación de la CA depende de `DB_CA_CERT` (ver
+        // `opcionesSsl()` arriba). Sin esa variable se mantiene el
+        // comportamiento original (`rejectUnauthorized: false`), el del
+        // despliegue en Wasmer contra Supabase.
+        ssl: opcionesSsl(configService),
         connectTimeoutMS: 30000,
         uuidExtension: 'pgcrypto', // para que los ids uuid se generen en Postgres
       }),

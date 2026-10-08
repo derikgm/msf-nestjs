@@ -78,6 +78,8 @@ rellenar. El `.env` real está en `.gitignore` y no se sube nunca.
 | Variable | Para qué sirve |
 | --- | --- |
 | `DATABASE_URL` | Postgres |
+| `DB_SSL` | `false` apaga el TLS de la BD (Postgres local sin certificados). Sin definir se asume SSL, que es lo que exige Supabase |
+| `DB_CA_CERT` | Lista de confianza del certificado de la BD (N-6): el pem de la CA en una sola línea, con `\n`. Si se define, la conexión pasa a `rejectUnauthorized: true` y solo acepta certificados firmados por esa CA; si no, se mantiene el comportamiento de siempre (`rejectUnauthorized: false`) |
 | `AUTH_JWT_SECRET` | Firma de los tokens. Genera uno con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `AUTH_JWT_EXPIRES_IN` | Vigencia del token: `30m`, `8h`, `7d` |
 | `SUPABASE_URL` | Proyecto de Supabase (Storage) |

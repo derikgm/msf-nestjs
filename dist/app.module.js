@@ -16,6 +16,14 @@ import { StorageQuotaModule } from './common/modules/storage-quota/storage-quota
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
+function opcionesSsl(configService) {
+    if (configService.get('DB_SSL') === 'false')
+        return false;
+    const ca = configService.get('DB_CA_CERT')?.replace(/\\n/g, '\n');
+    return ca
+        ? { rejectUnauthorized: true, ca }
+        : { rejectUnauthorized: false };
+}
 let AppModule = class AppModule {
 };
 AppModule = __decorate([
@@ -44,9 +52,7 @@ AppModule = __decorate([
                     migrations: [Inicial1791390744944],
                     migrationsTableName: 'migrations',
                     migrationsRun: true,
-                    ssl: configService.get('DB_SSL') === 'false'
-                        ? false
-                        : { rejectUnauthorized: false },
+                    ssl: opcionesSsl(configService),
                     connectTimeoutMS: 30000,
                     uuidExtension: 'pgcrypto',
                 }),
