@@ -820,3 +820,11 @@ Los pasos 4 a 6 necesitan la `SUPABASE_SERVICE_ROLE_KEY` real en `.env` y el buc
 | `GET /delys/ofertas` | La vitrina de Delys está fuera del alcance por ahora. **Ojo:** si un cálculo automático vuelve a hacer esta lista, revisar antes `Delys/`, que no se ha analizado. |
 | `POST /delys/pedido` | Mismo caso: la web pública de Delys es quien podría enviarlo. No se ha revisado `Delys/` por petición del usuario. |
 | `POST /adc/pedido`, `GET /adc/pedidos`, `GET \| DELETE /adc/pedidos/:id` | La web pública de ADC no tiene formulario de pedido y el panel no tiene pestaña de pedidos (decisión del 2026-10-07: los pedidos se retoman más adelante). **Si algún día se retoman, empezar por aquí.** |
+
+### Aviso al retomar `POST /adc/pedido`
+
+Hoy esa ruta usa `CreatePedidoDto`, cuyo renglón se llama **`dulce`** (`adc.controller.ts:213`).
+Cualquier cliente que mande `encargos[].producto` —que es como lo dibuja ADC— recibe **400** desde
+que N-17 activó `forbidNonWhitelisted`. Está hecha la traducción a `producto` en
+`src/adc/dto/create-pedido-adc.dto.ts` (versionada el 2026-10-08), pero **sin conectar**: al
+integrarla hay que hacer que el controlador la use y pruebe la ruta de punta a punta.
