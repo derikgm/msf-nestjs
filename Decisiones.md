@@ -19,8 +19,8 @@ Fecha de la última verificación: 2026-09-30 (`npm run build` en verde; validac
 
 **Qué se cambió.**
 
-* `src/delys/dto/create-pedido.dto.ts`: `CreateDulceDto` se eliminó. `CreateEncargoDto.dulce` pasó de ser el dulce completo a ser un `number` con `@IsInt() @IsPositive()`.
-* `src/delys/delys.service.ts`: `upsertDulce()` se borró. `crearPedido()` llama a `dulcesDelCatalogo()`, que carga con `findBy({ id: In(ids) })`, indexa por id y calcula el total con esos precios.
+* `src/common/dto/create-pedido.dto.ts`: `CreateDulceDto` se eliminó. `CreateEncargoDto.dulce` pasó de ser el dulce completo a ser un `number` con `@IsInt() @IsPositive()`.
+* `src/common/services/catalogo.service.ts`: `upsertDulce()` se borró. `crearPedido()` llama a `dulcesDelCatalogo()`, que carga con `findBy({ id: In(ids) })`, indexa por id y calcula el total con esos precios.
 * Un id que no existe en el catálogo da `404`: `"No existe el dulce 99"` si falta uno, `"No existen los dulces 98, 99"` si faltan varios.
 
 **Por qué.** Un endpoint de pedido no debe escribir el catálogo. Con el DTO viejo, mandar `precio: 1` para un dulce de 1000 salía por 1, y además se podía renombrar un dulce o inventarse uno nuevo con el id que uno quisiera.
@@ -99,10 +99,10 @@ if (user.rol === ROL_SUPERUSUARIO) return true;
 **Qué se cambió.**
 
 * `src/common/utils/fecha.util.ts` (nuevo): el decorador `@IsFechaDeEntrega()`.
-* `src/delys/dto/create-pedido.dto.ts`: los cinco campos con sus reglas. `notas` es el único opcional.
-* `src/delys/entities/pedido.entity.ts`: las cinco columnas.
-* `src/delys/interfaces/delys.interfaces.ts`: `Pedido` refleja las columnas.
-* `src/delys/delys.service.ts`: `crearPedido()` los guarda, con `.trim()` en los textos.
+* `src/common/dto/create-pedido.dto.ts`: los cinco campos con sus reglas. `notas` es el único opcional.
+* `src/common/entities/pedido.entity.ts`: las cinco columnas.
+* `src/common/interfaces/catalogo.interfaces.ts`: `Pedido` refleja las columnas.
+* `src/common/services/catalogo.service.ts`: `crearPedido()` los guarda, con `.trim()` en los textos.
 
 **Por qué se compara el día local y no la fecha completa.** La regla es "no se encarga para ayer", así que la comparación es entre días, sin horas: si hoy ya es tarde, un pedido para hoy sigue aceptándose. Y el día se arma con `new Date(anio, mes - 1, dia)`, no con `Date.parse`, que interpreta el texto como UTC. En una zona como UTC-6 eso convertía "2026-10-01" en el 30 de septiembre local y rechazaba un pedido válido por un día.
 

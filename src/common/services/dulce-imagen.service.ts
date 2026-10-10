@@ -69,13 +69,21 @@ export class DulceImagenService {
       throw error;
     }
 
-    // Si el dulce ya tenía imagen, la anterior libera su cuota.
-    await this.liberarDe(dulce, caller.rol);
+    // N-19: la imagen anterior se suelta **después** del save, no antes. Antes
+    // esta llamada iba aquí y, si el `save` de abajo fallaba, la nueva imagen
+    // quedaba subida en Storage sin fila que la apuntara (huérfana) y la
+    // anterior ya no estaba: la fila apuntaba a una URL vacía.
+    const urlAnterior = dulce.imagen_url;
+    const bytesAnteriores = dulce.imagen_bytes;
 
     dulce.imagen_url = this.supabase.getPublicUrl(bucket, path);
     dulce.imagen_bytes = bytes;
 
     const actualizado = await this.dulceRepo.save(dulce);
+
+    if (urlAnterior) {
+      await this.soltar(urlAnterior, bytesAnteriores, dulceId, caller.rol);
+    }
 
     return {
       mensaje: 'Imagen subida correctamente',
@@ -93,17 +101,13 @@ export class DulceImagenService {
     }
 
     const bytes = dulce.imagen_bytes ?? 0;
-    const bucket = this.bucketDe(caller.rol);
-    const path = this.supabase.pathDesdeUrl(bucket, dulce.imagen_url);
 
-    if (path) await this.supabase.eliminar(bucket, [path]);
+    await this.soltar(dulce.imagen_url, bytes, dulceId, caller.rol);
 
     dulce.imagen_url = null;
     dulce.imagen_bytes = null;
 
     const actualizado = await this.dulceRepo.save(dulce);
-
-    if (bytes) await this.cuota.decrementarUso(caller.rol, bytes);
 
     return {
       mensaje: 'Imagen eliminada',
@@ -120,30 +124,63 @@ export class DulceImagenService {
    * borrar un dulce sin foto es lo normal. Está pensado para que quien borre la
    * fila no tenga que saber nada de Storage ni de la cuota.
    *
-   * Si Storage no está configurado o no responde, el fallo se registra pero no
-   * detiene el borrado: el dulce sí tiene que desaparecer del catálogo, y el
-   * archivo huérfano se limpia a mano (ver TODO.md, "Cuota de Storage").
+   * Si Storage no está configurado o no responde, el fallo se registra (error,
+   * con stack) pero no detiene el borrado: el dulce sí tiene que desaparecer
+   * del catálogo, y el archivo huérfano se limpia a mano (ver TODO.md, "Cuota
+   * de Storage").
    */
   async liberarParaBorrar(dulce: Dulce, caller: AuthUser) {
     try {
-      await this.liberarDe(dulce, caller.rol);
+      await this.soltar(dulce.imagen_url, dulce.imagen_bytes, dulce.id, caller.rol);
     } catch (error) {
-      this.logger.warn(
-        `No se pudo liberar la imagen del dulce ${dulce.id}: ${(error as Error).message}. ` +
-          'El dulce se borra igual y el archivo queda pendiente de limpiar a mano.',
+      this.logger.error(
+        `No se pudo liberar la imagen del ${this.config.articulo} ${dulce.id}: ${(error as Error).message}. ` +
+          'El archivo queda pendiente de limpiar a mano.',
+        (error as Error).stack,
       );
     }
   }
 
-  /** El archivo de un dulce y sus bytes de cuota. Falla si Storage no responde. */
-  private async liberarDe(dulce: Dulce, rol: string) {
-    if (!dulce.imagen_url) return;
+  /**
+   * Borra el archivo de Storage y, si se borró, devuelve sus bytes a la cuota.
+   *
+   * N-19: antes el borrado se tragaba un `warn` y la fila seguía; aquí se
+   * reintenta una vez y, si sigue fallando, se loguea como **error** con el
+   * path concreto. La cuota no se devuelve si el archivo sigue en Storage,
+   * para que el contador y el espacio real no se descuadren.
+   */
+  private async soltar(
+    imagenUrl: string | null,
+    imagenBytes: number | null,
+    etiqueta: number | string,
+    rol: string,
+  ) {
+    if (!imagenUrl) return;
 
     const bucket = this.bucketDe(rol);
-    const path = this.supabase.pathDesdeUrl(bucket, dulce.imagen_url);
+    const path = this.supabase.pathDesdeUrl(bucket, imagenUrl);
 
-    if (path) await this.supabase.eliminar(bucket, [path]);
-    if (dulce.imagen_bytes) await this.cuota.decrementarUso(rol, dulce.imagen_bytes);
+    if (!path) return;
+
+    try {
+      await this.supabase.eliminar(bucket, [path]);
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo borrar la imagen de ${etiqueta} (${path}): ${(error as Error).message}. Reintentando...`,
+      );
+
+      try {
+        await this.supabase.eliminar(bucket, [path]);
+      } catch (segundoError) {
+        this.logger.error(
+          `La imagen de ${etiqueta} (${path}) sigue sin borrarse tras el reintento: ` +
+            `${(segundoError as Error).message}. El archivo queda pendiente de limpiar a mano y su cuota no se libera.`,
+        );
+        return;
+      }
+    }
+
+    if (imagenBytes) await this.cuota.decrementarUso(rol, imagenBytes);
   }
 
   private async obtenerDulce(id: number) {

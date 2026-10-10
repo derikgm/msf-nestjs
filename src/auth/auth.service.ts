@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,7 @@ import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
 import { CreateUsuarioAdminDto } from './dto/create-usuario-admin.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto.js';
 import { ROL_SUPERUSUARIO, Usuario, type RolUsuario } from './entities/index.js';
 import { AuthUser } from './auth.interfaces.js';
 import { HASH_FICTICIO, hashPassword, verifyPassword } from './password.util.js';
@@ -115,6 +117,66 @@ export class AuthService {
     }
 
     return this.crear(dto, dto.rol);
+  }
+
+  /** Lista todos los usuarios ordenados por fecha de creación. */
+  async listarUsuarios() {
+    const usuarios = await this.usuarioRepo.find({
+      order: { creado_en: 'DESC' },
+      select: {
+        id: true,
+        nombre: true,
+        usuario: true,
+        rol: true,
+        activo: true,
+        creado_en: true,
+      },
+    });
+
+    return { usuarios };
+  }
+
+  /** Actualiza rol y/o activo de un usuario. */
+  async actualizarUsuario(id: string, dto: UpdateUsuarioDto, caller: AuthUser) {
+    if (caller.rol !== ROL_SUPERUSUARIO) {
+      throw new ForbiddenException('Solo un administrador puede gestionar usuarios');
+    }
+
+    const usuario = await this.buscarPorId(id);
+
+    if (!usuario) {
+      throw new NotFoundException('No existe el usuario ' + id);
+    }
+
+    if (dto.rol !== undefined) {
+      usuario.rol = dto.rol;
+    }
+
+    if (dto.activo !== undefined) {
+      usuario.activo = dto.activo;
+    }
+
+    await this.usuarioRepo.save(usuario);
+
+    const { password_hash, ...resto } = usuario as Usuario;
+    return { mensaje: 'Usuario actualizado', usuario: resto };
+  }
+
+  /** Elimina un usuario por su id. */
+  async eliminarUsuario(id: string, caller: AuthUser) {
+    if (caller.rol !== ROL_SUPERUSUARIO) {
+      throw new ForbiddenException('Solo un administrador puede gestionar usuarios');
+    }
+
+    const usuario = await this.buscarPorId(id);
+
+    if (!usuario) {
+      throw new NotFoundException('No existe el usuario ' + id);
+    }
+
+    await this.usuarioRepo.delete(id);
+
+    return { mensaje: 'Usuario eliminado' };
   }
 
   /** Cada usuario cambia su propia contraseña. */

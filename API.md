@@ -16,6 +16,9 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/delys/secciones` | público |
 | `POST` | `/delys/secciones` | `delys` o `admin`, **alta de sección** |
 | `GET` | `/adc/productos` | público, devuelve `productos` **y** `secciones` |
+| `POST` | `/adc/productos` | `adc` o `admin`, **alta en el catálogo** |
+| `PATCH` | `/adc/productos/:id` | `adc` o `admin`, **edita nombre, precio, moneda o sección** |
+| `DELETE` | `/adc/productos/:id` | `adc` o `admin`, **borra del catálogo** |
 | `POST` | `/adc/productos/:id/imagen` | `adc` o `admin`, sube la foto; la respuesta trae la clave **`producto`** (no `dulce`) |
 | `DELETE` | `/adc/productos/:id/imagen` | `adc` o `admin`, quita la foto; igual, clave **`producto`** |
 | `GET` | `/adc/secciones` | público |
@@ -28,6 +31,9 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `POST` | `/auth/admin/usuarios` | **solo `admin`**, crea usuarios y les asigna el rol |
 | `POST` | `/auth/cambiar-password` | cualquier rol, solo la propia contraseña |
 | `GET` | `/auth/yo` | cualquier rol |
+| `GET` | `/auth/usuarios` | **solo `admin`**, lista todos los usuarios |
+| `PATCH` | `/auth/usuarios/:id` | **solo `admin`**, cambia `rol` y/o `activo` |
+| `DELETE` | `/auth/usuarios/:id` | **solo `admin`**, borra el usuario |
 | `GET` | `/storage/quota` | cualquier rol, devuelve la cuota de su proyecto |
 | `POST` | `/delys/dulces` | `delys` o `admin`, **alta en el catálogo** |
 | `PATCH` | `/delys/dulces/:id` | `delys` o `admin`, **edita nombre, precio, moneda o sección** |
@@ -36,6 +42,10 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `GET` | `/delys/pedidos` | `delys` o `admin` |
 | `GET` | `/delys/pedidos/:id` | `delys` o `admin` |
 | `DELETE` | `/delys/pedidos/:id` | `delys` o `admin` |
+| `POST` | `/adc/pedido` | **público** |
+| `GET` | `/adc/pedidos` | `adc` o `admin` |
+| `GET` | `/adc/pedidos/:id` | `adc` o `admin` |
+| `DELETE` | `/adc/pedidos/:id` | `adc` o `admin` |
 | `POST` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
 | `DELETE` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
 
@@ -43,15 +53,19 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 
 Las rutas públicas son las que puede usar alguien sin cuenta: mirar el catálogo y **enviar un pedido**. El cliente de la pastelería no tiene credenciales, así que el alta de pedidos no lleva token. El resto de rutas de pedidos (`GET`/`DELETE`) sí lo exigen, porque son las del panel.
 
-Formato de errores, siempre el mismo:
+Formato de errores, siempre el mismo (N-18, filtro global `HttpErrorFilter`):
 
 ```json
-{ "message": "No existe el dulce 99", "error": "Bad Request", "statusCode": 400 }
+{ "statusCode": 400, "mensaje": "No existe el dulce 99" }
 ```
+
+En los `400` de validación `mensaje` es un **array** de motivos (uno por regla
+rota). Para los clientes que aún leían el antiguo `message` de Nest, el campo
+`message` viaja igual en `mensaje` (el panel lo entiende desde N-18).
 
 Códigos usados: `400` datos inválidos o cuota insuficiente, `401` sin token / token caducado / contraseña incorrecta / usuario desactivado, `403` rol que no es el del proyecto, `404` recurso inexistente, `409` `usuario` repetido, `429` demasiadas peticiones (más abajo), `503` falta la configuración de Supabase **o** la base de datos no respondió.
 
-Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"message": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos.
+Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"mensaje": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos. **Los GET públicos de catálogo están exentos** (`@SkipThrottle()`): `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /adc/productos` y `GET /adc/secciones` no devuelven nunca `429`.
 
 Los cuatro fallos del guard tienen mensajes distintos, para que el cliente sepa si tiene que iniciar sesión otra vez o solo reintentar:
 
@@ -224,6 +238,73 @@ curl localhost:3000/auth/yo -H "Authorization: Bearer eyJ..."
 
 ---
 
+### 7.1. `GET /auth/usuarios`
+
+Listado de usuarios para el panel de administración. **Solo `admin`** (JWT + `@Roles('admin')`); cualquier otro rol recibe `403`.
+
+```bash
+curl localhost:3000/auth/usuarios -H "Authorization: Bearer eyJ..."
+```
+
+```json
+{
+  "usuarios": [
+    {
+      "id": "8afce1d2-...",
+      "nombre": "Mari",
+      "usuario": "mari",
+      "rol": "delys",
+      "activo": true,
+      "creado_en": "2026-01-15T10:20:30.000Z"
+    }
+  ]
+}
+```
+
+Ordenado por `creado_en` de más reciente a más antiguo. **La contraseña nunca aparece** (`password_hash` es `select: false`).
+
+---
+
+### 7.2. `PATCH /auth/usuarios/:id`
+
+Cambia el rol y/o el flag `activo` de un usuario. **Solo `admin`**. El `id` debe ser un UUID (si no, `400`).
+
+```bash
+curl -X PATCH localhost:3000/auth/usuarios/8afce1d2-... \
+  -H 'content-type: application/json' -H "Authorization: Bearer eyJ..." \
+  -d '{"activo": false}'
+```
+
+```json
+{
+  "mensaje": "Usuario actualizado",
+  "usuario": { "id": "8afce1d2-...", "nombre": "Mari", "usuario": "mari", "rol": "delys", "activo": false, "creado_en": "2026-01-15T10:20:30.000Z" }
+}
+```
+
+- Los dos campos son opcionales y se pueden mandar juntos (`{"rol": "adc", "activo": true}`).
+- `rol` acepta solo los valores del enum `ROLES` (`delys`, `domus`, `adc`, `admin`); otro valor da `400`.
+- `activo: false` retira el acceso **al instante**: `JwtAuthGuard` comprueba el flag en cada petición y el siguiente intento con ese token devuelve `401`.
+- Usuario inexistente → `404`.
+
+---
+
+### 7.3. `DELETE /auth/usuarios/:id`
+
+Borra el usuario. **Solo `admin`**.
+
+```bash
+curl -X DELETE localhost:3000/auth/usuarios/8afce1d2-... -H "Authorization: Bearer eyJ..."
+```
+
+```json
+{ "mensaje": "Usuario eliminado" }
+```
+
+No hay protección contra borrarse a uno mismo ni contra dejar un rol sin usuarios: si hace falta rellenarlo, se crea otro con `POST /auth/usuarios` (o el registro inicial mientras el rol esté vacío). Usuario inexistente → `404`.
+
+---
+
 ### 8. `GET /storage/quota`
 
 Estado de la cuota **del proyecto del token** (no del usuario: los usuarios de `delys` comparten la misma). Sin parámetros.
@@ -261,12 +342,12 @@ curl localhost:3000/delys/dulces
 ```json
 {
   "dulces": [
-    { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "imagen_bytes": null, "moneda": "CUP" }
+    { "id": 1, "nombre": "Charolas surtida", "precio": 1000, "imagen_url": null, "moneda": "CUP", "seccion_id": 1, "seccion": { "id": 1, "nombre": "dulces" } }
   ]
 }
 ```
 
-`imagen_url` es `null` hasta que se suba una imagen por `/delys/dulces/:id/imagen`; `imagen_bytes` es el tamaño del archivo y existe para poder devolver los bytes a la cuota al borrar.
+`imagen_url` es `null` hasta que se suba una imagen por `/delys/dulces/:id/imagen`. El `imagen_bytes` (tamaño del archivo, contador interno de la cuota de Storage) **no** sale en la API (N-15): es un dato del servidor para poder devolver los bytes a la cuota al borrar, y el cliente no lo usa.
 
 `moneda` es la moneda en la que se lee `precio`. Es **texto de hasta 8 letras y no un enum** (`varchar(8)`, por defecto `CUP`): así caben hoy `USD`, `EUR`, `MLC`… y mañana otra sin migrar nada ni tocar el servidor. Las filas que ya existían en la base se crearon todas en `CUP`.
 
@@ -453,8 +534,7 @@ Ejemplo del `400` por cuota:
 
 ```json
 {
-  "message": "La cuota de \"delys\" no alcanza para esta imagen: usa 0 de 50 bytes (50 disponibles) y la imagen pesa 70 bytes",
-  "error": "Bad Request",
+  "mensaje": "La cuota de \"delys\" no alcanza para esta imagen: usa 0 de 50 bytes (50 disponibles) y la imagen pesa 70 bytes",
   "statusCode": 400
 }
 ```
@@ -511,7 +591,7 @@ curl -X POST localhost:3000/delys/dulces \
 ```json
 {
   "mensaje": "Dulce creado correctamente",
-  "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 1800, "imagen_url": null, "imagen_bytes": null, "moneda": "USD" }
+  "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 1800, "imagen_url": null, "moneda": "USD", "seccion_id": null, "seccion": null }
 }
 ```
 
@@ -552,7 +632,7 @@ curl -X PATCH localhost:3000/delys/dulces/12 \
 ```
 
 ```json
-{ "mensaje": "Dulce actualizado correctamente", "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 2100, "imagen_url": null, "imagen_bytes": null, "moneda": "EUR" } }
+{ "mensaje": "Dulce actualizado correctamente", "dulce": { "id": 12, "nombre": "Concha de chocolate", "precio": 2100, "imagen_url": null, "moneda": "EUR", "seccion_id": null, "seccion": null } }
 ```
 
 | Situación | Respuesta |
@@ -717,3 +797,41 @@ curl localhost:3000/storage/quota -H "Authorization: Bearer $TOKEN"
 ```
 
 Los pasos 4 a 6 necesitan la `SUPABASE_SERVICE_ROLE_KEY` real en `.env` y el bucket `delys` creado y público en el panel de Supabase.
+
+---
+
+## Endpoints sin cliente (X-7)
+
+> **Decisión del usuario (2026-10-08): documentar, no borrar.** Todo lo de esta sección se deja
+> en el código tal cual; aquí se anota quién lo usa de verdad para que nadie lo dé por muerto ni
+> lo «arregle» quitándolo.
+>
+> Comprobado el 2026-10-08 grepeando las rutas que llaman `msf-app` (`src/lib/api`, `src/lib/*.ts`)
+> y `adc` (`src/app/services`).
+
+### Ya tienen cliente (antes aparecían como huérfanos)
+
+| Endpoint | Quién lo consume desde hoy |
+|---|---|
+| `GET /storage/quota` | pestaña **Cuenta** del panel, tarjeta de cuota de imágenes (M-11) |
+| `GET /delys/pedidos`, `GET /delys/pedidos/:id` | pestaña **Pedidos** del panel |
+| `GET /auth/usuarios`, `PATCH /auth/usuarios/:id`, `DELETE /auth/usuarios/:id`, `POST /auth/admin/usuarios` | pestaña **Usuarios** del panel, solo rol `admin` (M-5) |
+
+### Siguen sin nadie que los llame
+
+| Endpoint | Por qué se queda |
+|---|---|
+| `POST /auth/registro` | El panel da de alta con `POST /auth/admin/usuarios`. Se conserva por si se quiere registro con invitación. |
+| `POST /auth/usuarios` | Igual: alta sin token con rol restringido; el panel usa la ruta de `admin`. |
+| `GET /delys/secciones`, `POST /delys/secciones`, `PATCH\|DELETE /delys/secciones/:id` | Descartado el CRUD de secciones para Delys: «Delys solo muestra dulces» (decisión del 2026-10-07). |
+| `GET /delys/ofertas` | La vitrina de Delys está fuera del alcance por ahora. **Ojo:** si un cálculo automático vuelve a hacer esta lista, revisar antes `Delys/`, que no se ha analizado. |
+| `POST /delys/pedido` | Mismo caso: la web pública de Delys es quien podría enviarlo. No se ha revisado `Delys/` por petición del usuario. |
+| `POST /adc/pedido`, `GET /adc/pedidos`, `GET \| DELETE /adc/pedidos/:id` | La web pública de ADC no tiene formulario de pedido y el panel no tiene pestaña de pedidos (decisión del 2026-10-07: los pedidos se retoman más adelante). **Si algún día se retoman, empezar por aquí.** |
+
+### Aviso al retomar `POST /adc/pedido`
+
+Hoy esa ruta usa `CreatePedidoDto`, cuyo renglón se llama **`dulce`** (`adc.controller.ts:213`).
+Cualquier cliente que mande `encargos[].producto` —que es como lo dibuja ADC— recibe **400** desde
+que N-17 activó `forbidNonWhitelisted`. Está hecha la traducción a `producto` en
+`src/adc/dto/create-pedido-adc.dto.ts` (versionada el 2026-10-08), pero **sin conectar**: al
+integrarla hay que hacer que el controlador la use y pruebe la ruta de punta a punta.

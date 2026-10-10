@@ -1,5 +1,4 @@
 node_modules/
-package-lock.json
 .env
 
 # Caché incremental de tsc. Son dos nombres distintos: "tsbuildinfo" lo escribe
@@ -21,3 +20,6 @@ frontends/**
 !frontends/README.md
 # Respaldo de la base de datos (contiene hashes de contraseñas): nunca se sube.
 respaldo/
+
+# Compilado de TypeScript: se regenera con npm run build y no se versiona.
+dist/

@@ -43,7 +43,7 @@ Cada token lleva un **rol** y hay dos guards: el de autenticación (firma + que 
 
 ### El modelo de usuarios
 
-El rol **es** el proyecto: `delys`, `domus`. No hay un superusuario que vea los dos; cada usuario solo ve lo de su proyecto. La excepción es `admin`: administra la plataforma y `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin tocar los decoradores uno por uno. El aislamiento entre `delys` y `domus` no se toca.
+El rol **es** el proyecto: `delys`, `domus`. Cada usuario solo ve lo de su proyecto, salvo `admin`, que **sí ve los dos catálogos**: `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin tocar los decoradores uno por uno. El aislamiento entre `delys` y `domus` no se toca.
 
 `admin` es además el único que puede **asignar el rol** al crear un usuario: `POST /auth/admin/usuarios` recibe `rol` en el cuerpo (en `POST /auth/usuarios` ese campo se ignora, el rol sale del token).
 
@@ -71,11 +71,15 @@ Enviar `rol` en el body de `/auth/usuarios` no sirve de nada: se ignora y se usa
 
 La contraseña se compara con `scrypt` + `timingSafeEqual` (`src/auth/password.util.ts`), sin dependencias nativas, contra el hash de la fila de `usuario`. El login siempre calcula un hash aunque el usuario no exista, para que el tiempo de respuesta no delate qué usuarios existen.
 
-Variables de entorno (`.env`):
+Variables de entorno (`.env`). La lista completa de claves, con valores de
+ejemplo y sin secretos, está en **`.env.example`**: `cp .env.example .env` y
+rellenar. El `.env` real está en `.gitignore` y no se sube nunca.
 
 | Variable | Para qué sirve |
 | --- | --- |
 | `DATABASE_URL` | Postgres |
+| `DB_SSL` | `false` apaga el TLS de la BD (Postgres local sin certificados). Sin definir se asume SSL, que es lo que exige Supabase |
+| `DB_CA_CERT` | Lista de confianza del certificado de la BD (N-6): el pem de la CA en una sola línea, con `\n`. Si se define, la conexión pasa a `rejectUnauthorized: true` y solo acepta certificados firmados por esa CA; si no, se mantiene el comportamiento de siempre (`rejectUnauthorized: false`) |
 | `AUTH_JWT_SECRET` | Firma de los tokens. Genera uno con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `AUTH_JWT_EXPIRES_IN` | Vigencia del token: `30m`, `8h`, `7d` |
 | `SUPABASE_URL` | Proyecto de Supabase (Storage) |
@@ -83,7 +87,7 @@ Variables de entorno (`.env`):
 
 Si falta `AUTH_JWT_SECRET` la app **no arranca**: es preferible fallar al inicio que devolver 500 en la primera petición. Las variables de Supabase sí son perezosas: si faltan, solo fallan las rutas de imagen (503), el resto sigue sirviendo.
 
-En Wasmer **no subas `.env`**: define las cuatro variables como variables de entorno del despliegue.
+En Wasmer **no subas `.env`**: define las variables como variables de entorno del despliegue (la lista completa, sin secretos, está en `.env.example`).
 
 ## Imágenes de los dulces
 

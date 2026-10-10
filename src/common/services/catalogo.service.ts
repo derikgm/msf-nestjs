@@ -14,6 +14,7 @@ import { CreatePedidoDto } from '../dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../dto/create-dulce.dto.js';
 import { UpdateDulceDto } from '../dto/update-dulce.dto.js';
 import { Dulce, Encargo, Pedido, Seccion } from '../entities/index.js';
+import type { DulcePublico, Paginacion } from '../interfaces/catalogo.interfaces.js';
 import { ofertas } from '../data/ofertas.js';
 import { NEGOCIO, type NegocioConfig } from '../config/negocio.config.js';
 import { DulceImagenService } from './dulce-imagen.service.js';
@@ -89,7 +90,19 @@ export class CatalogoService implements OnApplicationBootstrap {
         negocio: this.config.clave,
       }));
 
-      await this.dulceRepo.save(this.dulceRepo.create(semilla));
+      // N-19: `orIgnore()` es `INSERT ... ON CONFLICT DO NOTHING`. El count de
+      // arriba es solo para no intentar sembrar a cada arranque; la protección
+      // real es esta sentencia: si dos instancias arrancan a la vez y las dos
+      // ven la tabla vacía, la segunda choca contra la PK `id` y Postgres se
+      // queda con la primera (antes era un `QueryFailedError` y catálogo
+      // duplicado).
+      await this.dulceRepo
+        .createQueryBuilder()
+        .insert()
+        .into(Dulce)
+        .values(semilla)
+        .orIgnore()
+        .execute();
       this.logger.log(`Catálogo inicial cargado: ${semilla.length} ${this.config.articulo}s`);
     }
 
@@ -296,14 +309,48 @@ export class CatalogoService implements OnApplicationBootstrap {
     return { ok: true, pedido: await this.obtenerPedido(pedido.id) };
   }
 
-  async obtenerTodosDulces() {
+  async obtenerTodosDulces(paginacion?: Paginacion) {
     const dulces = await this.dulceRepo.find({
       where: { negocio: this.config.clave },
       relations: { seccion: true },
       order: { id: 'ASC' },
+      ...this.recorte(paginacion),
     });
 
-    return { dulces };
+    // N-15: solo los campos públicos. `imagen_bytes` (contador de la cuota de
+    // Storage) y `negocio` (filtro del servidor) no salen en el GET.
+    return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+  }
+
+  /**
+   * N-11: `skip`/`take` solo cuando el cliente pidió `pagina` y `limite`
+   * válidos. Sin ellos se devuelve todo: las vitrinas pintan el catálogo
+   * entero y romperían si de pronto la respuesta viniera cortada.
+   */
+  private recorte(paginacion?: Paginacion): { skip?: number; take?: number } {
+    const { pagina, limite } = paginacion ?? {};
+
+    if (!pagina || !limite || pagina < 1 || limite < 1) return {};
+
+    return { skip: (pagina - 1) * limite, take: limite };
+  }
+
+  /**
+   * Proyección pública de un dulce (N-15): lo que ve el cliente. La sección va
+   * como objeto (la relación cargada); cada controlador la enseña a su manera.
+   */
+  private proyectar(dulce: Dulce): DulcePublico {
+    return {
+      id: dulce.id,
+      nombre: dulce.nombre,
+      precio: dulce.precio,
+      imagen_url: dulce.imagen_url,
+      moneda: dulce.moneda,
+      // En `crearDulce` la relación recién asignada aún no ha rellenado la
+      // columna: se cae al `.seccion?.id` si la columna no llegó.
+      seccion_id: dulce.seccion_id ?? dulce.seccion?.id ?? null,
+      seccion: dulce.seccion ?? null,
+    };
   }
 
   /**
@@ -351,7 +398,8 @@ export class CatalogoService implements OnApplicationBootstrap {
 
       const guardado = await manager.save(Dulce, dulce);
 
-      return { mensaje: `${this.articuloEnMayuscula()} creado correctamente`, dulce: guardado };
+      // N-15: la respuesta del alta también proyecta solo los campos públicos.
+      return { mensaje: `${this.articuloEnMayuscula()} creado correctamente`, dulce: this.proyectar(guardado) };
     });
   }
 
@@ -407,7 +455,8 @@ export class CatalogoService implements OnApplicationBootstrap {
 
     const guardado = await this.dulceRepo.save(dulce);
 
-    return { mensaje: `${this.articuloEnMayuscula()} actualizado correctamente`, dulce: guardado };
+    // N-15: proyecta solo los campos públicos, igual que el alta y el GET.
+    return { mensaje: `${this.articuloEnMayuscula()} actualizado correctamente`, dulce: this.proyectar(guardado) };
   }
 
   /**
@@ -467,8 +516,12 @@ export class CatalogoService implements OnApplicationBootstrap {
     );
   }
 
-  async obtenerTodosPedidos() {
-    const pedidos = await this.pedidoRepo.find({ where: { negocio: this.config.clave }, relations });
+  async obtenerTodosPedidos(paginacion?: Paginacion) {
+    const pedidos = await this.pedidoRepo.find({
+      where: { negocio: this.config.clave },
+      relations,
+      ...this.recorte(paginacion),
+    });
 
     return { pedidos };
   }
@@ -491,9 +544,31 @@ export class CatalogoService implements OnApplicationBootstrap {
     return { ok: true };
   }
 
-  //Seccion de ofertas:
-  obtenerOfertas() {
-    return { ofertas };
+  /**
+   * Las ofertas de la pastelería: los productos con los que nació el catálogo
+   * (los ids de `data/ofertas.ts`), leídos **de la tabla** y no del archivo
+   * estático (N-13): si el precio cambió en el catálogo, la oferta enseña el
+   * precio nuevo. Sin token (lo consume la vitrina).
+   */
+  async obtenerOfertas() {
+    const ids = ofertas.map((oferta) => oferta.id);
+
+    const dulces = await this.dulceRepo.find({
+      where: { negocio: this.config.clave, id: In(ids) },
+      order: { id: 'ASC' },
+    });
+
+    // Misma forma que en API.md (§10). Si un dulce de la semilla se borró, su
+    // oferta simplemente deja de salir.
+    return {
+      ofertas: dulces.map((dulce) => ({
+        id: dulce.id,
+        nombre: dulce.nombre,
+        precio: dulce.precio,
+        imagen_url: dulce.imagen_url,
+        moneda: dulce.moneda,
+      })),
+    };
   }
 
   /**

@@ -37,13 +37,30 @@ export class StorageQuotaService implements OnApplicationBootstrap {
     };
   }
 
+  /**
+   * Descuenta bytes en una sola sentencia con `GREATEST`, sin leer antes.
+   *
+   * La versión anterior leía `bytes_usados`, calculaba `restantes` en JS y
+   * luego escribía: dos borrados de imagen simultáneos podían leer el mismo
+   * valor y el segundo pisaba el primero (la cuota quedaba desviada, ver
+   * N-19). Ahora Postgres hace el máximo en la misma sentencia: si la cuota
+   * ya quedó en 0, `GREATEST(0 - n, 0)` se queda en 0, nunca en negativo.
+   *
+   * `bytes` se valida antes con `comprobarBytes()` (entero positivo) y se
+   * interpola igual que hace `reservarCuota()`.
+   */
   async decrementarUso(rol: string, bytes: number): Promise<void> {
     this.comprobarBytes(bytes);
+    await this.asegurarRol(rol);
 
-    const registro = await this.asegurarRol(rol);
-    const restantes = Math.max(registro.bytes_usados - bytes, 0);
-
-    await this.quotaRepo.update({ rol }, { bytes_usados: restantes });
+    await this.quotaRepo
+      .createQueryBuilder()
+      .update(StorageQuota)
+      .set({
+        bytes_usados: () => `GREATEST(bytes_usados - ${bytes}, 0)`,
+      })
+      .where('rol = :rol', { rol })
+      .execute();
   }
 
   /**

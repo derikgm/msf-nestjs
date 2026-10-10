@@ -9,26 +9,23 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { minutes, Throttle } from '@nestjs/throttler';
+import { minutes, SkipThrottle, Throttle } from '@nestjs/throttler';
+import { interceptorDeImagen } from '../common/uploads/imagen.archivo.js';
+import { usuarioActual } from '../common/utils/auth.util.js';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
 import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
-import type { AuthUser, RequestConUsuario } from '../auth/auth.interfaces.js';
+import type { RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
-
-/** Tope de transporte: el máximo por archivo del plan Free de Supabase Storage. */
-const TAMANO_MAXIMO_ARCHIVO = 50 * 1024 * 1024;
-
-const TIPOS_PERMITIDOS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 @Controller('delys')
 export class DelysController {
@@ -37,14 +34,22 @@ export class DelysController {
     private readonly imagenService: DulceImagenService,
   ) {}
 
-  // Catálogo: público, sin token.
+  // Catálogo: público, sin token. Los GET públicos están fuera del rate limit
+  // (N-5): la vitrina recorre catálogo, secciones e imágenes en cada visita y un
+  // 429 se vería como un fallo de la web, no como un abuso.
   @Public()
+  @SkipThrottle()
   @Get('dulces')
-  obtenerDulces() {
-    return this.catalogo.obtenerTodosDulces();
+  obtenerDulces(
+    @Query('pagina', new ParseIntPipe({ optional: true })) pagina?: number,
+    @Query('limite', new ParseIntPipe({ optional: true })) limite?: number,
+  ) {
+    // N-11: la paginación es opcional y solo corta si llegan los dos parámetros.
+    return this.catalogo.obtenerTodosDulces({ pagina, limite });
   }
 
   @Public()
+  @SkipThrottle()
   @Get('ofertas')
   obtenerOfertas() {
     return this.catalogo.obtenerOfertas();
@@ -55,6 +60,7 @@ export class DelysController {
   // de Delys (los productos viejos se migran ahí), así que esconderla rompería
   // la vitrina. En ADC se hace al revés (ver `AdcController`).
   @Public()
+  @SkipThrottle()
   @Get('secciones')
   obtenerSecciones() {
     return this.catalogo.listarSecciones();
@@ -91,7 +97,7 @@ export class DelysController {
     @Param('id', new ParseIntPipe()) id: number,
     @Req() request: RequestConUsuario,
   ) {
-    return this.catalogo.eliminarDulce(id, this.usuarioActual(request));
+    return this.catalogo.eliminarDulce(id, usuarioActual(request));
   }
 
   // Imágenes: multipart/form-data con el archivo en el campo "imagen".
@@ -100,23 +106,7 @@ export class DelysController {
   // y no se toca el disco del servidor.
   @Roles('delys')
   @Post('dulces/:id/imagen')
-  @UseInterceptors(
-    FileInterceptor('imagen', {
-      limits: { fileSize: TAMANO_MAXIMO_ARCHIVO, files: 1 },
-      fileFilter: (_req, file, callback) => {
-        if (!TIPOS_PERMITIDOS.includes(file.mimetype)) {
-          return callback(
-            new BadRequestException(
-              `Tipo de archivo no permitido: ${file.mimetype}. Usa ${TIPOS_PERMITIDOS.join(', ')}`,
-            ),
-            false,
-          );
-        }
-
-        return callback(null, true);
-      },
-    }),
-  )
+  @UseInterceptors(interceptorDeImagen('imagen'))
   subirImagen(
     @Param('id', new ParseIntPipe()) id: number,
     @UploadedFile() file: MulterFile | undefined,
@@ -128,7 +118,7 @@ export class DelysController {
       );
     }
 
-    return this.imagenService.subir(id, file, this.usuarioActual(request));
+    return this.imagenService.subir(id, file, usuarioActual(request));
   }
 
   @Roles('delys')
@@ -137,7 +127,7 @@ export class DelysController {
     @Param('id', new ParseIntPipe()) id: number,
     @Req() request: RequestConUsuario,
   ) {
-    return this.imagenService.eliminar(id, this.usuarioActual(request));
+    return this.imagenService.eliminar(id, usuarioActual(request));
   }
 
   // Alta de pedidos: pública. El cliente de la pastelería no tiene cuenta, así que
@@ -152,8 +142,11 @@ export class DelysController {
 
   @Roles('delys')
   @Get('pedidos')
-  obtenerPedidos() {
-    return this.catalogo.obtenerTodosPedidos();
+  obtenerPedidos(
+    @Query('pagina', new ParseIntPipe({ optional: true })) pagina?: number,
+    @Query('limite', new ParseIntPipe({ optional: true })) limite?: number,
+  ) {
+    return this.catalogo.obtenerTodosPedidos({ pagina, limite });
   }
 
   @Roles('delys')
@@ -166,12 +159,5 @@ export class DelysController {
   @Delete('pedidos/:id')
   remove(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.catalogo.remove(id);
-  }
-
-  /** El JwtAuthGuard ya bloquea sin token, esto solo evita el undefined si se reutiliza. */
-  private usuarioActual(request: RequestConUsuario): AuthUser {
-    if (!request.user) throw new BadRequestException('Petición sin usuario autenticado');
-
-    return request.user;
   }
 }
