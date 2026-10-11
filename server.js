@@ -35,6 +35,8 @@ async function bootstrap() {
     'http://localhost:1420', // msf-app en desarrollo (vite)
     'http://localhost:4200', // adc en desarrollo (ng serve)
     'http://127.0.0.1:4200',
+    'tauri://localhost', // msf-app empaquetada (Tauri): escritorio y Android
+    'http://tauri.localhost', // variante de origin que usa Tauri en Android/iOS
   ]);
 
   app.enableCors({
