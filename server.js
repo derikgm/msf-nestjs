@@ -59,6 +59,22 @@ async function bootstrap() {
     }),
   );
 
+  /**
+   * Cuánto aguanta el servidor recibiendo una petición entera.
+   *
+   * Node corta con un 408 la petición que tarda más de 5 minutos en llegar
+   * completa, y una foto de 8 MB tarda casi eso a 30 KB/s: en datos móviles
+   * lentos (Cuba) el servidor cortaría la subida aunque la app ya no la corte
+   * por tardar. Se sube a 15 minutos, que da margen hasta a ~9 KB/s. Las
+   * cabeceras, en cambio, llegan de una vez: su minuto de plazo se queda igual.
+   *
+   * Es un tope y no «sin límite» a propósito: una conexión muerta deja de
+   * mandar y libera el socket sola, pero conviene que ninguna conexión se quede
+   * colgada para siempre.
+   */
+  const servidorHttp = app.getHttpServer();
+  servidorHttp.requestTimeout = 15 * 60 * 1000;
+
   const port = process.env.PORT || 3000;
   await app.listen(port);
   new Logger('Bootstrap').log(`NestJS server listening on ${port}`);
