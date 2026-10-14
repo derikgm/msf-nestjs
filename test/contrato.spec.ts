@@ -30,6 +30,7 @@ import { JwtAuthGuard } from '../src/auth/auth.guard.js';
 import { RolesGuard } from '../src/auth/roles.guard.js';
 import { CatalogoService } from '../src/common/services/catalogo.service.js';
 import { DulceImagenService } from '../src/common/services/dulce-imagen.service.js';
+import { InstalacionesService } from '../src/common/services/instalaciones.service.js';
 import { HttpErrorFilter } from '../src/common/filters/http-error.filter.js';
 
 const SECRETO_PRUEBA = 'clave-de-prueba-de-los-tests';
@@ -89,6 +90,21 @@ const imagenServiceMock = {
   })),
 };
 
+// Punto 3 de todo.md: el controlador de ADC ahora inyecta también el servicio
+// de instalaciones. Se mockea igual que los demás para no tocar la base.
+const instalacionesServiceMock = {
+  listar: vi.fn(async () => [
+    {
+      id: 3,
+      nombre_servicio: 'Paneles solares',
+      precio: 45000,
+      moneda: 'CUP',
+      imagen_url: null,
+      descripcion: ['Diseño', 'Montaje'],
+    },
+  ]),
+};
+
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64',
@@ -116,6 +132,7 @@ describe('Contratos de la API (X-5, sin base de datos viva)', () => {
         { provide: AuthService, useValue: authServiceMock },
         { provide: CatalogoService, useValue: catalogoServiceMock },
         { provide: DulceImagenService, useValue: imagenServiceMock },
+        { provide: InstalacionesService, useValue: instalacionesServiceMock },
       ],
     }).compile();
 
@@ -184,6 +201,25 @@ describe('Contratos de la API (X-5, sin base de datos viva)', () => {
     // Proyección N-15: los campos internos no viajan en la API pública.
     expect(producto.imagen_bytes).toBeUndefined();
     expect(producto.negocio).toBeUndefined();
+  });
+
+  it('GET /adc/instalaciones devuelve las instalaciones, sin imagen_bytes ni creado_en', async () => {
+    const res = await request(app.getHttpServer()).get('/adc/instalaciones');
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.instalaciones)).toBe(true);
+
+    const instalacion = res.body.instalaciones[0];
+    expect(instalacion).toMatchObject({
+      id: 3,
+      nombre_servicio: 'Paneles solares',
+      precio: 45000,
+      moneda: 'CUP',
+      imagen_url: null,
+      descripcion: ['Diseño', 'Montaje'],
+    });
+    expect(instalacion.imagen_bytes).toBeUndefined();
+    expect(instalacion.creado_en).toBeUndefined();
   });
 
   it('POST /adc/productos/:id/imagen parsea el multipart (multer 2) y responde con la clave producto', async () => {

@@ -19,11 +19,15 @@ import { interceptorDeImagen } from '../common/uploads/imagen.archivo.js';
 import { usuarioActual } from '../common/utils/auth.util.js';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
+import { InstalacionesService } from '../common/services/instalaciones.service.js';
 import type { DulcePublico } from '../common/interfaces/catalogo.interfaces.js';
+import type { Instalacion as InstalacionShape } from '../common/interfaces/instalaciones-combos.interfaces.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
+import { CreateInstalacionDto } from '../common/dto/create-instalacion.dto.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
+import { UpdateInstalacionDto } from '../common/dto/update-instalacion.dto.js';
 import type { RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -50,6 +54,7 @@ export class AdcController {
   constructor(
     private readonly catalogo: CatalogoService,
     private readonly imagenService: DulceImagenService,
+    private readonly instalaciones: InstalacionesService,
   ) {}
 
   // Catálogo: público, sin token, igual que la vitrina de Delys. Devuelve los
@@ -91,6 +96,21 @@ export class AdcController {
       imagen_url: dulce.imagen_url,
       seccion_id: dulce.seccion_id,
       seccion: dulce.seccion?.nombre ?? null,
+    };
+  }
+
+  /**
+   * Instalación tal como se enseña en la API: los campos públicos, sin
+   * `imagen_bytes` (contador interno de la cuota) ni `creado_en`.
+   */
+  private aInstalacion(instalacion: InstalacionShape) {
+    return {
+      id: instalacion.id,
+      nombre_servicio: instalacion.nombre_servicio,
+      precio: instalacion.precio,
+      moneda: instalacion.moneda,
+      imagen_url: instalacion.imagen_url,
+      descripcion: instalacion.descripcion,
     };
   }
 
@@ -202,6 +222,84 @@ export class AdcController {
     );
 
     return { mensaje, producto: dulce, cuota };
+  }
+
+  // --- Instalaciones (punto 3 de todo.md) -------------------------------------
+  // Servicios que ofrece ADC (paneles solares, Ecoflow, baterías…): su propia
+  // tabla, sin columna `negocio`. Lectura pública para la web; el resto exige
+  // el rol `adc` como el catálogo.
+  @Public()
+  @SkipThrottle()
+  @Get('instalaciones')
+  async obtenerInstalaciones() {
+    const instalaciones = await this.instalaciones.listar();
+
+    return { instalaciones: instalaciones.map((instalacion) => this.aInstalacion(instalacion)) };
+  }
+
+  @Roles('adc')
+  @Post('instalaciones')
+  async crearInstalacion(@Body() createInstalacionDto: CreateInstalacionDto) {
+    const { mensaje, instalacion } = await this.instalaciones.crear(createInstalacionDto);
+
+    return { mensaje, instalacion: this.aInstalacion(instalacion) };
+  }
+
+  @Roles('adc')
+  @Patch('instalaciones/:id')
+  async actualizarInstalacion(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Body() updateInstalacionDto: UpdateInstalacionDto,
+  ) {
+    const { mensaje, instalacion } = await this.instalaciones.actualizar(id, updateInstalacionDto);
+
+    return { mensaje, instalacion: this.aInstalacion(instalacion) };
+  }
+
+  @Roles('adc')
+  @Delete('instalaciones/:id')
+  eliminarInstalacion(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Req() request: RequestConUsuario,
+  ) {
+    return this.instalaciones.eliminar(id, usuarioActual(request));
+  }
+
+  @Roles('adc')
+  @Post('instalaciones/:id/imagen')
+  @UseInterceptors(interceptorDeImagen('imagen'))
+  async subirImagenInstalacion(
+    @Param('id', new ParseIntPipe()) id: number,
+    @UploadedFile() file: MulterFile | undefined,
+    @Req() request: RequestConUsuario,
+  ) {
+    if (!file) {
+      throw new BadRequestException(
+        'Falta el archivo. Envíalo como multipart/form-data en el campo "imagen"',
+      );
+    }
+
+    const { mensaje, instalacion, cuota } = await this.instalaciones.subirImagen(
+      id,
+      file,
+      usuarioActual(request),
+    );
+
+    return { mensaje, instalacion: this.aInstalacion(instalacion), cuota };
+  }
+
+  @Roles('adc')
+  @Delete('instalaciones/:id/imagen')
+  async eliminarImagenInstalacion(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Req() request: RequestConUsuario,
+  ) {
+    const { mensaje, instalacion, cuota } = await this.instalaciones.eliminarImagen(
+      id,
+      usuarioActual(request),
+    );
+
+    return { mensaje, instalacion: this.aInstalacion(instalacion), cuota };
   }
 
   // Alta de pedidos: pública, por la misma razón que en Delys (el cliente no
