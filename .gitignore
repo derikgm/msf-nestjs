@@ -21,5 +21,7 @@ frontends/**
 # Respaldo de la base de datos (contiene hashes de contraseñas): nunca se sube.
 respaldo/
 
-# Compilado de TypeScript: se regenera con npm run build y no se versiona.
-dist/
+# Compilado de TypeScript. SÍ se versiona: el deploy de Wasmer tiene el build
+# desactivado (build: "" en save/derikgm-msf-nestjs.yaml) y arranca con
+# `node server.js`, que importa ./dist/app.module.js. Si dist/ no está en el
+# repo, el deploy muere con 500. La caché de tsc (tsbuildinfo) sí se ignora.
