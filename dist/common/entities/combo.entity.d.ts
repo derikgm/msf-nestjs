@@ -1,5 +1,5 @@
 import { Combo as ComboShape } from '../interfaces/instalaciones-combos.interfaces.js';
-import { ComboDulce } from './combo-dulce.entity.js';
+import type { ComboDulce } from './combo-dulce.entity.js';
 export declare class Combo implements ComboShape {
     id: number;
     nombre_combo: string;

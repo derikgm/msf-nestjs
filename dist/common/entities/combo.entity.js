@@ -9,7 +9,6 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, } from 'typeorm';
 import { numericTransformer } from '../utils/numeric.transformer.js';
-import { ComboDulce } from './combo-dulce.entity.js';
 let Combo = class Combo {
     id;
     nombre_combo;
@@ -50,7 +49,7 @@ __decorate([
     __metadata("design:type", Object)
 ], Combo.prototype, "imagen_bytes", void 0);
 __decorate([
-    OneToMany(() => ComboDulce, (dulce) => dulce.combo, { cascade: true }),
+    OneToMany('ComboDulce', (dulce) => dulce.combo, { cascade: true }),
     __metadata("design:type", Array)
 ], Combo.prototype, "dulces", void 0);
 __decorate([
