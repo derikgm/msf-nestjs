@@ -25,6 +25,12 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `POST` | `/adc/secciones` | `adc` o `admin`, **alta de sección** |
 | `PATCH` | `/adc/secciones/:id` | `adc` o `admin`, **renombra una sección** |
 | `DELETE` | `/adc/secciones/:id` | `adc` o `admin`, **borra una sección vacía** |
+| `GET` | `/adc/instalaciones` | público, **servicios de instalación de ADC** |
+| `POST` | `/adc/instalaciones` | `adc` o `admin`, **alta de instalación** |
+| `PATCH` | `/adc/instalaciones/:id` | `adc` o `admin`, **edita nombre, precio, moneda o descripción** |
+| `DELETE` | `/adc/instalaciones/:id` | `adc` o `admin`, **borra la instalación** |
+| `POST` | `/adc/instalaciones/:id/imagen` | `adc` o `admin`, sube la foto; la respuesta trae la clave **`instalacion`** |
+| `DELETE` | `/adc/instalaciones/:id/imagen` | `adc` o `admin`, quita la foto; igual, clave **`instalacion`** |
 | `POST` | `/auth/login` | público |
 | `POST` | `/auth/registro` | público, **solo** mientras el rol no tenga usuarios |
 | `POST` | `/auth/usuarios` | cualquier rol, crea usuarios **de ese mismo rol** |
@@ -48,6 +54,12 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `DELETE` | `/adc/pedidos/:id` | `adc` o `admin` |
 | `POST` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
 | `DELETE` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
+| `GET` | `/delys/combos` | público, **combos de dulces de Delys** |
+| `POST` | `/delys/combos` | `delys` o `admin`, **alta de combo** |
+| `PATCH` | `/delys/combos/:id` | `delys` o `admin`, **edita nombre, precio, moneda o dulces** |
+| `DELETE` | `/delys/combos/:id` | `delys` o `admin`, **borra el combo** |
+| `POST` | `/delys/combos/:id/imagen` | `delys` o `admin`, sube la foto; la respuesta trae la clave **`combo`** |
+| `DELETE` | `/delys/combos/:id/imagen` | `delys` o `admin`, quita la foto; igual, clave **`combo`** |
 
 `admin` es el único rol con paso libre: `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin importar el rol que pida. El resto de roles solo ven lo de su propio proyecto (ver [Decisiones.md](Decisiones.md), punto 1.3).
 
@@ -65,7 +77,7 @@ rota). Para los clientes que aún leían el antiguo `message` de Nest, el campo
 
 Códigos usados: `400` datos inválidos o cuota insuficiente, `401` sin token / token caducado / contraseña incorrecta / usuario desactivado, `403` rol que no es el del proyecto, `404` recurso inexistente, `409` `usuario` repetido, `429` demasiadas peticiones (más abajo), `503` falta la configuración de Supabase **o** la base de datos no respondió.
 
-Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"mensaje": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos. **Los GET públicos de catálogo están exentos** (`@SkipThrottle()`): `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /adc/productos` y `GET /adc/secciones` no devuelven nunca `429`.
+Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"mensaje": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos. **Los GET públicos de catálogo están exentos** (`@SkipThrottle()`): `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /delys/combos`, `GET /adc/productos`, `GET /adc/secciones` y `GET /adc/instalaciones` no devuelven nunca `429`.
 
 Los cuatro fallos del guard tienen mensajes distintos, para que el cliente sepa si tiene que iniciar sesión otra vez o solo reintentar:
 
@@ -766,6 +778,112 @@ curl -X DELETE localhost:3000/adc/secciones/4 -H "Authorization: Bearer eyJ..."
 | sin token / rol equivocado | `401` / `403` |
 
 No se borra nada con productos dentro, ni se los manda a escondidas: `producto.seccion_id` es una clave foránea sin `ON DELETE`, así que la base lo rechazaría igual, y mandarlos a `dulces` los escondería de la tienda. Primero se reubican (`PATCH` con `seccion_id`) y después se borra la sección.
+
+---
+
+### 21. Instalaciones de ADC y combos de Delys
+
+Las dos «opciones extra» de las páginas (punto 3 de todo.md). No viven en el catálogo compartido: cada una tiene su propia tabla y **no se parecen entre sí** (una lleva una lista de textos, la otra una lista de dulces con cantidad). La lectura es pública; la gestión exige el rol del negocio (o `admin`).
+
+- `adc_instalaciones`: los servicios que ofrece ADC (paneles solares, Ecoflow, baterías…).
+- `delys_combos` + `delys_combo_dulces`: las ofertas de Delys. Los dulces de cada combo se guardan **por nombre**, no por clave foránea al catálogo: el combo puede llevar dulces que ya existen **o** unos escritos a mano en el panel que no se dan de alta.
+
+Las dos comparten el mismo `ImagenService` que usan dulces y productos, con su propia carpeta en Storage (`instalaciones` y `combos`). En ambas, la lista se devuelve **lo último primero** (`creado_en` descendente).
+
+#### 21.1. `GET /adc/instalaciones`
+
+Pública (exenta del límite de peticiones). Devuelve los servicios con su descripción:
+
+```bash
+curl localhost:3000/adc/instalaciones
+# -> { "instalaciones": [ { "id": 1, "nombre_servicio": "Paneles solares", "precio": 18500,
+#                           "moneda": "CUP", "imagen_url": null,
+#                           "descripcion": ["Instalación desde temprano", "Con garantía"] } ] }
+```
+
+`descripcion` es un `text[]`: cada renglón es un punto que la web pinta como viñeta. Un alta sin descripción la deja como lista vacía (`[]`).
+
+#### 21.2. `POST|PATCH|DELETE /adc/instalaciones[/:id]`
+
+Gestión desde el panel, con token `adc` o `admin`. El alta:
+
+```bash
+curl -X POST localhost:3000/adc/instalaciones -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"nombre_servicio":"Paneles solares","precio":18500,"moneda":"CUP","descripcion":["Instalación desde temprano"]}'
+# -> { "mensaje": "Instalación creada", "instalacion": { "id": 1, ... } }
+```
+
+`PATCH` manda solo lo que cambia (todo opcional) y responde `{ "mensaje": "Instalación actualizada", "instalacion": { ... } }`; `DELETE` responde `{ "mensaje": "Instalación eliminada" }`.
+
+| Situación | Respuesta |
+| --- | --- |
+| `nombre_servicio` vacío o de más de 120 letras | `400` |
+| `precio` negativo, no numérico o con más de dos decimales | `400` |
+| `moneda` de más de 8 letras | `400`; si va vacía o no se manda, se asume `CUP` (siempre en mayúsculas) |
+| cada línea de `descripcion` de más de 300 letras | `400`; las líneas vacías se descartan al guardar |
+| `id` inexistente | `404`: `No existe la instalación 1` |
+| sin token / rol equivocado | `401` / `403` |
+
+#### 21.3. `POST|DELETE /adc/instalaciones/:id/imagen`
+
+Multipart con el campo **`imagen`**, igual que las fotos del catálogo. La respuesta trae la instalación actualizada y la cuota:
+
+```bash
+curl -X POST localhost:3000/adc/instalaciones/1/imagen -H "Authorization: Bearer eyJ..." -F imagen=@panel.png
+# -> { "mensaje": "Imagen subida correctamente", "instalacion": { "id": 1, "imagen_url": "https://...", ... }, "cuota": { ... } }
+```
+
+Subir una nueva reemplaza la anterior (y devuelve sus bytes a la cuota); `DELETE` responde `{ "mensaje": "Imagen eliminada", "instalacion": { ..., "imagen_url": null }, "cuota": { ... } }` y no toca el resto de la instalación.
+
+#### 21.4. `GET /delys/combos`
+
+Pública (exenta del límite de peticiones). Devuelve los combos con sus dulces, en el orden en que se dieron de alta dentro del combo:
+
+```bash
+curl localhost:3000/delys/combos
+# -> { "combos": [ { "id": 1, "nombre_combo": "Combo familiar", "precio": 2500, "moneda": "CUP",
+#                    "imagen_url": null,
+#                    "dulces": [ { "nombre_dulce": "Charolas surtida", "cantidad": 2 },
+#                                { "nombre_dulce": "Dulce secreto", "cantidad": 1 } ] } ] }
+```
+
+#### 21.5. `POST|PATCH|DELETE /delys/combos[/:id]`
+
+Gestión desde el panel, con token `delys` o `admin`. El alta:
+
+```bash
+curl -X POST localhost:3000/delys/combos -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"nombre_combo":"Combo familiar","precio":2500,"moneda":"CUP","dulces":[{"nombre_dulce":"Charolas surtida","cantidad":2}]}'
+# -> { "mensaje": "Combo creado", "combo": { "id": 1, ... } }
+```
+
+`PATCH` manda solo lo que cambia y responde `{ "mensaje": "Combo actualizado", "combo": { ... } }`; `DELETE` responde `{ "mensaje": "Combo eliminado" }`.
+
+| Situación | Respuesta |
+| --- | --- |
+| `nombre_combo` vacío o de más de 120 letras | `400` |
+| `precio` negativo, no numérico o con más de dos decimales | `400` |
+| `moneda` de más de 8 letras | `400`; si va vacía o no se manda, se asume `CUP` |
+| un `nombre_dulce` vacío o de más de 120 letras | `400` |
+| `cantidad` que no sea entero o menor que 1 | `400` |
+| `dulces` que no sea una lista | `400`; sin el campo, el combo se crea sin dulces |
+| `id` inexistente | `404`: `No existe el combo 1` |
+| sin token / rol equivocado | `401` / `403` |
+
+**Importante:** si un `PATCH` trae `dulces`, **reemplaza la lista entera** (borra los viejos y mete los nuevos); no los mezcla. Es lo que hace el panel y lo más simple de razonar.
+
+#### 21.6. `POST|DELETE /delys/combos/:id/imagen`
+
+Igual que las instalaciones, con la carpeta `combos` y la clave **`combo`** en la respuesta:
+
+```bash
+curl -X POST localhost:3000/delys/combos/1/imagen -H "Authorization: Bearer eyJ..." -F imagen=@combo.png
+# -> { "mensaje": "Imagen subida correctamente", "combo": { "id": 1, "imagen_url": "https://...", ... }, "cuota": { ... } }
+```
+
+El borrado responde `{ "mensaje": "Imagen eliminada", "combo": { ..., "imagen_url": null }, "cuota": { ... } }`. Al borrar un combo, sus renglones de `delys_combo_dulces` se van en cascada con él.
 
 ---
 
