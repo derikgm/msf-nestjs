@@ -182,6 +182,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
             nombre: dulce.nombre,
             precio: dulce.precio,
             imagen_url: dulce.imagen_url,
+            descripcion: dulce.descripcion,
             moneda: dulce.moneda,
             seccion_id: dulce.seccion_id ?? dulce.seccion?.id ?? null,
             seccion: dulce.seccion ?? null,
@@ -211,6 +212,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
                 negocio: this.config.clave,
                 imagen_url: null,
                 imagen_bytes: null,
+                descripcion: this.normalizarDescripcion(createDulceDto.descripcion),
                 seccion,
             });
             const guardado = await manager.save(Dulce, dulce);
@@ -220,13 +222,18 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
     normalizarMoneda(moneda) {
         return moneda?.trim().toUpperCase() || 'CUP';
     }
+    normalizarDescripcion(descripcion) {
+        const limpia = descripcion?.trim();
+        return limpia ? limpia : null;
+    }
     async actualizarDulce(id, updateDulceDto) {
-        const { nombre, precio, moneda, seccion_id } = updateDulceDto;
+        const { nombre, precio, moneda, descripcion, seccion_id } = updateDulceDto;
         if (nombre === undefined &&
             precio === undefined &&
             moneda === undefined &&
+            descripcion === undefined &&
             seccion_id === undefined) {
-            throw new BadRequestException('No hay nada que actualizar: manda "nombre", "precio", "moneda" o "seccion_id"');
+            throw new BadRequestException('No hay nada que actualizar: manda "nombre", "precio", "moneda", "descripcion" o "seccion_id"');
         }
         const dulce = await this.dulceRepo.findOneBy({ id, negocio: this.config.clave });
         if (!dulce)
@@ -237,6 +244,8 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
             dulce.precio = precio;
         if (moneda !== undefined)
             dulce.moneda = this.normalizarMoneda(moneda);
+        if (descripcion !== undefined)
+            dulce.descripcion = this.normalizarDescripcion(descripcion);
         if (seccion_id !== undefined) {
             const seccion = await this.seccionRepo.findOneBy({
                 id: seccion_id,

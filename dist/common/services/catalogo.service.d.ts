@@ -50,6 +50,7 @@ export declare class CatalogoService implements OnApplicationBootstrap {
         dulce: DulcePublico;
     }>;
     private normalizarMoneda;
+    private normalizarDescripcion;
     actualizarDulce(id: number, updateDulceDto: UpdateDulceDto): Promise<{
         mensaje: string;
         dulce: DulcePublico;

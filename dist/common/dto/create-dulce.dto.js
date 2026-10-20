@@ -12,6 +12,7 @@ import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, MaxLengt
 export class CreateDulceDto {
     nombre;
     precio;
+    descripcion;
     moneda;
     seccion_id;
 }
@@ -27,6 +28,12 @@ __decorate([
     Min(0, { message: 'El precio no puede ser negativo' }),
     __metadata("design:type", Number)
 ], CreateDulceDto.prototype, "precio", void 0);
+__decorate([
+    IsOptional(),
+    IsString({ message: 'La descripción tiene que ser texto' }),
+    MaxLength(2000, { message: 'La descripción no puede pasar de 2000 letras' }),
+    __metadata("design:type", String)
+], CreateDulceDto.prototype, "descripcion", void 0);
 __decorate([
     IsOptional(),
     IsString({ message: 'La moneda tiene que ser texto' }),

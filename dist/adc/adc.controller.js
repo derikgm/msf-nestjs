@@ -49,6 +49,7 @@ let AdcController = class AdcController {
             precio: dulce.precio,
             moneda: dulce.moneda,
             imagen_url: dulce.imagen_url,
+            descripcion: dulce.descripcion,
             seccion_id: dulce.seccion_id,
             seccion: dulce.seccion?.nombre ?? null,
         };

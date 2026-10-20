@@ -16,6 +16,7 @@ let Dulce = class Dulce {
     precio;
     imagen_url;
     imagen_bytes;
+    descripcion;
     moneda;
     negocio;
     seccion_id;
@@ -46,6 +47,10 @@ __decorate([
     Column({ type: 'int', nullable: true }),
     __metadata("design:type", Object)
 ], Dulce.prototype, "imagen_bytes", void 0);
+__decorate([
+    Column({ type: 'text', nullable: true }),
+    __metadata("design:type", Object)
+], Dulce.prototype, "descripcion", void 0);
 __decorate([
     Column({ type: 'varchar', length: 8, default: 'CUP' }),
     __metadata("design:type", String)

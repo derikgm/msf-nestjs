@@ -345,6 +345,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       nombre: dulce.nombre,
       precio: dulce.precio,
       imagen_url: dulce.imagen_url,
+      descripcion: dulce.descripcion,
       moneda: dulce.moneda,
       // En `crearDulce` la relación recién asignada aún no ha rellenado la
       // columna: se cae al `.seccion?.id` si la columna no llegó.
@@ -393,6 +394,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         negocio: this.config.clave,
         imagen_url: null,
         imagen_bytes: null,
+        descripcion: this.normalizarDescripcion(createDulceDto.descripcion),
         seccion,
       });
 
@@ -413,20 +415,30 @@ export class CatalogoService implements OnApplicationBootstrap {
   }
 
   /**
-   * Edición parcial. Se manda solo lo que cambia, y mandar los tres campos es
-   * válido: en ese caso los dos cambian.
+   * La descripción es opcional: se recorta y, si queda vacía, se guarda como
+   * null para que la vitrina sepa que no hay nada que enseñar.
+   */
+  private normalizarDescripcion(descripcion?: string | null): string | null {
+    const limpia = descripcion?.trim();
+    return limpia ? limpia : null;
+  }
+
+  /**
+   * Edición parcial. Se manda solo lo que cambia, y mandar todos los campos es
+   * válido: en ese caso cambian todos.
    */
   async actualizarDulce(id: number, updateDulceDto: UpdateDulceDto) {
-    const { nombre, precio, moneda, seccion_id } = updateDulceDto;
+    const { nombre, precio, moneda, descripcion, seccion_id } = updateDulceDto;
 
     if (
       nombre === undefined &&
       precio === undefined &&
       moneda === undefined &&
+      descripcion === undefined &&
       seccion_id === undefined
     ) {
       throw new BadRequestException(
-        'No hay nada que actualizar: manda "nombre", "precio", "moneda" o "seccion_id"',
+        'No hay nada que actualizar: manda "nombre", "precio", "moneda", "descripcion" o "seccion_id"',
       );
     }
 
@@ -437,6 +449,7 @@ export class CatalogoService implements OnApplicationBootstrap {
     if (nombre !== undefined) dulce.nombre = nombre.trim();
     if (precio !== undefined) dulce.precio = precio;
     if (moneda !== undefined) dulce.moneda = this.normalizarMoneda(moneda);
+    if (descripcion !== undefined) dulce.descripcion = this.normalizarDescripcion(descripcion);
 
     // Mover el producto entre secciones. La nueva sección tiene que ser de este
     // negocio (ver `crearDulce`); el DTO exige un id de sección positivo y no

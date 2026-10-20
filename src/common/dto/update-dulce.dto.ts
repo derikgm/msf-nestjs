@@ -7,7 +7,7 @@ import { CreateDulceDto } from './create-dulce.dto.js';
  * validación (N-20: antes se copiaba campo a campo y cualquier cambio en el
  * alta había que repetirlo aquí).
  *
- * No pueden faltar los tres: `PATCH` sin nada que cambiar es un error del
+ * No pueden faltar todos: `PATCH` sin nada que cambiar es un error del
  * cliente, no un no-op (lo comprueba `CatalogoService.actualizarDulce()`).
  *
  * La imagen no pasa por aquí. Tiene su propio par de rutas porque va como

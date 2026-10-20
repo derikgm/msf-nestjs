@@ -13,6 +13,7 @@ export interface Dulce {
     nombre: string;
     precio: number;
     imagen_url: string | null;
+    descripcion: string | null;
     moneda: string;
     negocio: string;
     seccion_id: number | null;
@@ -30,6 +31,7 @@ export interface DulcePublico {
     nombre: string;
     precio: number;
     imagen_url: string | null;
+    descripcion: string | null;
     moneda: string;
     seccion_id: number | null;
     seccion: {

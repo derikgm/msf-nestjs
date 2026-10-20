@@ -20,6 +20,7 @@ export declare class AdcController {
             precio: number;
             moneda: string;
             imagen_url: string | null;
+            descripcion: string | null;
             seccion_id: number | null;
             seccion: string | null;
         }[];
@@ -55,6 +56,7 @@ export declare class AdcController {
             precio: number;
             moneda: string;
             imagen_url: string | null;
+            descripcion: string | null;
             seccion_id: number | null;
             seccion: string | null;
         };
@@ -67,6 +69,7 @@ export declare class AdcController {
             precio: number;
             moneda: string;
             imagen_url: string | null;
+            descripcion: string | null;
             seccion_id: number | null;
             seccion: string | null;
         };

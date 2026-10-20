@@ -17,6 +17,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
 import { InstalacionesYCombos1791900000000 } from './migraciones/1791900000000-InstalacionesYCombos.js';
+import { DescripcionProducto1791900000010 } from './migraciones/1791900000010-DescripcionProducto.js';
 function opcionesSsl(configService) {
     if (configService.get('DB_SSL') === 'false')
         return false;
@@ -50,7 +51,11 @@ AppModule = __decorate([
                     url: configService.get('DATABASE_URL'),
                     autoLoadEntities: true,
                     synchronize: false,
-                    migrations: [Inicial1791390744944, InstalacionesYCombos1791900000000],
+                    migrations: [
+                        Inicial1791390744944,
+                        InstalacionesYCombos1791900000000,
+                        DescripcionProducto1791900000010,
+                    ],
                     migrationsTableName: 'migrations',
                     migrationsRun: true,
                     ssl: opcionesSsl(configService),
