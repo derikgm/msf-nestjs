@@ -84,7 +84,6 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         try {
             const secciones = await this.seccionRepo.find({
                 where: { negocio: this.config.clave },
-                relations: { padre: true, hijos: true },
                 order: { id: 'ASC' },
             });
             return { secciones };

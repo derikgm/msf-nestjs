@@ -165,13 +165,11 @@ export class CatalogoService implements OnApplicationBootstrap {
     try {
       const secciones = await this.seccionRepo.find({
         where: { negocio: this.config.clave },
-        relations: { padre: true, hijos: true },
         order: { id: 'ASC' },
       });
 
       return { secciones };
     } catch (e) {
-      // Fallback por si la columna/relaciones aún no existen en BD
       const secciones = await this.seccionRepo.find({
         where: { negocio: this.config.clave },
         order: { id: 'ASC' },
