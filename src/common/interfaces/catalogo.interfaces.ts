@@ -31,6 +31,8 @@ export interface Dulce {
     precio: number,
     /** URL pública del archivo en Supabase Storage; null si el dulce no tiene imagen. */
     imagen_url: string | null,
+    /** Descripción larga del producto; null si no tiene. */
+    descripcion: string | null,
     /**
      * Moneda del `precio` (`'CUP'`, `'USD'`…). Texto libre de hasta 8 letras:
      * no es un enum, para que puedan entrar monedas nuevas sin migraciones.
@@ -75,6 +77,8 @@ export interface DulcePublico {
     precio: number,
     /** URL pública del archivo en Supabase Storage; null si no tiene imagen. */
     imagen_url: string | null,
+    /** Descripción larga del producto; null si no tiene. */
+    descripcion: string | null,
     /** Moneda del `precio` (`'CUP'`, `'USD'`…). Texto libre de hasta 8 letras. */
     moneda: string,
     /** A qué sección del catálogo pertenece: referencia a `seccion.id`. */

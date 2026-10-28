@@ -7,7 +7,9 @@ import {
 } from 'typeorm';
 import { numericTransformer } from '../utils/numeric.transformer.js';
 import { Combo as ComboShape } from '../interfaces/instalaciones-combos.interfaces.js';
-import { ComboDulce } from './combo-dulce.entity.js';
+// Import **de tipo**: se usa solo para tipar la propiedad y el parámetro del
+// callback, así que no genera una importación real en el JS compilado.
+import type { ComboDulce } from './combo-dulce.entity.js';
 
 /**
  * Una oferta de Delys (punto 3 de todo.md): varios dulces juntos por un precio,
@@ -48,8 +50,14 @@ export class Combo implements ComboShape {
    * Los dulces del combo. `cascade: true` deja que `save()` inserte los
    * renglones nuevos de una vez; el `Combo` los administra (el servicio los
    * reemplaza enteros cuando se edita el combo).
+   *
+   * La relación apunta **por nombre de entidad** (`'ComboDulce'`) y el tipo
+   * entra con `import type`, igual que en `Pedido`/`Encargo`: con
+   * `emitDecoratorMetadata` un ciclo de importaciones real entre entidades
+   * (`Combo` ↔ `ComboDulce`) revienta el arranque con
+   * «Cannot access 'Combo' before initialization».
    */
-  @OneToMany(() => ComboDulce, (dulce) => dulce.combo, { cascade: true })
+  @OneToMany('ComboDulce', (dulce: ComboDulce) => dulce.combo, { cascade: true })
   dulces: ComboDulce[];
 
   @CreateDateColumn({ type: 'timestamptz' })

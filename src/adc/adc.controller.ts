@@ -28,6 +28,7 @@ import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { UpdateInstalacionDto } from '../common/dto/update-instalacion.dto.js';
+import { UpdateSeccionDto } from '../common/dto/update-seccion.dto.js';
 import type { RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -78,7 +79,13 @@ export class AdcController {
 
     return {
       productos: dulces.map((dulce) => this.aProducto(dulce)),
-      secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+      secciones: secciones.map((seccion) => ({
+        id: seccion.id,
+        nombre: seccion.nombre,
+        // Subcategorías: `null` es categoría principal y un id es la categoría
+        // de la que cuelga. La web arma el árbol con esto.
+        padre_id: seccion.padre_id ?? null,
+      })),
     };
   }
 
@@ -94,6 +101,7 @@ export class AdcController {
       precio: dulce.precio,
       moneda: dulce.moneda,
       imagen_url: dulce.imagen_url,
+      descripcion: dulce.descripcion,
       seccion_id: dulce.seccion_id,
       seccion: dulce.seccion?.nombre ?? null,
     };
@@ -122,27 +130,45 @@ export class AdcController {
     const { secciones } = await this.catalogo.listarSecciones();
 
     return {
-      secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+      secciones: secciones.map((seccion) => ({
+        id: seccion.id,
+        nombre: seccion.nombre,
+        padre_id: seccion.padre_id ?? null,
+      })),
     };
   }
 
   @Roles('adc')
   @Post('secciones')
   crearSeccion(@Body() createSeccionDto: CreateSeccionDto) {
+<<<<<<< HEAD
     return this.catalogo.crearSeccion(createSeccionDto.nombre, createSeccionDto.parent_id);
+=======
+    return this.catalogo.crearSeccion(
+      createSeccionDto.nombre,
+      createSeccionDto.padre_id,
+    );
+>>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
   }
 
-  // Renombrar y borrar secciones (punto 2). El cuerpo del `PATCH` es la misma
-  // forma que el alta —solo manda el nombre—, así que se reutiliza el DTO.
-  // Borrar una sección con productos devuelve `409` con el número de ellos en
-  // vez de moverlos a escondidas (ver `CatalogoService.eliminarSeccion()`).
+  // Renombrar, mover de categoría y borrar secciones (punto 2 y subcategorías).
+  // El cuerpo del `PATCH` acepta `nombre` y/o `padre_id`; `padre_id: null` la
+  // convierte en categoría principal. Borrar una sección con productos o con
+  // subcategorías devuelve `409` (ver `CatalogoService.eliminarSeccion()`).
   @Roles('adc')
   @Patch('secciones/:id')
   actualizarSeccion(
     @Param('id', new ParseIntPipe()) id: number,
-    @Body() createSeccionDto: CreateSeccionDto,
+    @Body() updateSeccionDto: UpdateSeccionDto,
   ) {
+<<<<<<< HEAD
     return this.catalogo.actualizarSeccion(id, createSeccionDto.nombre, createSeccionDto.parent_id);
+=======
+    return this.catalogo.actualizarSeccion(id, {
+      nombre: updateSeccionDto.nombre,
+      padre_id: updateSeccionDto.padre_id,
+    });
+>>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
   }
 
   @Roles('adc')

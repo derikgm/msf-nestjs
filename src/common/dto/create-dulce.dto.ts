@@ -37,6 +37,16 @@ export class CreateDulceDto {
   precio: number;
 
   /**
+   * Descripción larga del producto. Opcional: sin ella la vitrina enseña solo
+   * nombre, precio y moneda. El servicio la recorta y, si queda vacía, la
+   * guarda como null.
+   */
+  @IsOptional()
+  @IsString({ message: 'La descripción tiene que ser texto' })
+  @MaxLength(2000, { message: 'La descripción no puede pasar de 2000 letras' })
+  descripcion?: string;
+
+  /**
    * Moneda en la que se lee `precio`. Opcional: si no llega, el servidor deja
    * `CUP`, que es el valor por defecto de la columna.
    *

@@ -154,7 +154,13 @@ export class CatalogoService implements OnApplicationBootstrap {
     return repo.save(repo.create({ negocio: this.config.clave, nombre: 'dulces' }));
   }
 
-  /** Las secciones del catálogo de este negocio, en orden de creación. */
+  /**
+   * Las secciones del catálogo de este negocio, en orden de creación.
+   *
+   * Cada fila trae su `padre_id` (subcategorías): `null` es categoría
+   * principal y un id es la categoría de la que cuelga. El orden es el de `id`
+   * porque el árbol se arma en el cliente (panel y tienda), no aquí.
+   */
   async listarSecciones() {
     const secciones = await this.seccionRepo.find({
       where: { negocio: this.config.clave },
@@ -170,9 +176,18 @@ export class CatalogoService implements OnApplicationBootstrap {
    * que "Electronico" y "electronico" no acaben como dos secciones distintas. Una
    * sección repetida en el mismo negocio da `409` (la base lo impone con el
    * `UNIQUE(negocio, nombre)` y aquí se traduce a un mensaje claro).
+<<<<<<< HEAD
    * Ahora admite `parent_id` para crear subcategorías.
    */
   async crearSeccion(nombre: string, parent_id?: number | null) {
+=======
+   *
+   * Con `padre_id` se crea una **subcategoría**; sin él (o con `null`), una
+   * categoría principal. El padre tiene que ser una categoría principal del
+   * mismo negocio: el árbol es de un solo nivel.
+   */
+  async crearSeccion(nombre: string, padreId?: number | null) {
+>>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
     const limpio = nombre.trim().toLowerCase();
     this.comprobarNombreDeSeccion(limpio);
 
@@ -180,6 +195,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       throw new ConflictException(`La sección "${limpio}" ya existe`);
     }
 
+<<<<<<< HEAD
     let padre: Seccion | null = null;
     if (parent_id != null) {
       padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
@@ -195,12 +211,23 @@ export class CatalogoService implements OnApplicationBootstrap {
 
     const guardada = await this.seccionRepo.save(
       this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio, padre }),
+=======
+    const padre = await this.resolverPadre(padreId);
+
+    const guardada = await this.seccionRepo.save(
+      this.seccionRepo.create({
+        negocio: this.config.clave,
+        nombre: limpio,
+        padre_id: padre?.id ?? null,
+      }),
+>>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
     );
 
     return { mensaje: 'Sección creada correctamente', seccion: guardada };
   }
 
   /**
+<<<<<<< HEAD
    * Cambia el nombre de una sección de este negocio (punto 2 del todo).
    * También permite cambiar/mover de categoría padre.
    */
@@ -208,6 +235,24 @@ export class CatalogoService implements OnApplicationBootstrap {
     const limpio = nombre.trim().toLowerCase();
     this.comprobarNombreDeSeccion(limpio);
 
+=======
+   * Cambia el nombre de una sección y/o la mueve de categoría (punto 2 del
+   * todo y subcategorías).
+   *
+   * Baja a minúsculas igual que en el alta, para que "Electronico" y
+   * "electronico" no acaben siendo dos secciones distintas, y pasa por la misma
+   * lista de nombres prohibidos. La sección se busca **dentro de este negocio**:
+   * el id de otro negocio responde `404`, no se renombra nada ajeno.
+   *
+   * `padre_id` es distinto de ausente: `null` la convierte en categoría
+   * principal, un número la cuelga de esa categoría. Una sección que ya tiene
+   * subcategorías no puede pasar a ser subcategoría (sería un segundo nivel).
+   */
+  async actualizarSeccion(
+    id: number,
+    cambios: { nombre?: string; padre_id?: number | null },
+  ) {
+>>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
     const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
 
     if (!seccion) throw new NotFoundException(`No existe la sección ${id}`);
@@ -217,11 +262,9 @@ export class CatalogoService implements OnApplicationBootstrap {
       );
     }
 
-    const repetida = await this.seccionRepo.findOneBy({
-      negocio: this.config.clave,
-      nombre: limpio,
-    });
+    let cambia = false;
 
+<<<<<<< HEAD
     if (repetida && repetida.id !== id) {
       throw new ConflictException(`La sección "${limpio}" ya existe`);
     }
@@ -254,19 +297,91 @@ export class CatalogoService implements OnApplicationBootstrap {
       }
     }
 
+=======
+    if (cambios.nombre !== undefined) {
+      const limpio = cambios.nombre.trim().toLowerCase();
+      this.comprobarNombreDeSeccion(limpio);
+
+      const repetida = await this.seccionRepo.findOneBy({
+        negocio: this.config.clave,
+        nombre: limpio,
+      });
+
+      // La misma comprobación que en el alta, pero dejando pasar la propia fila:
+      // un rename que no cambia el nombre no es un error.
+      if (repetida && repetida.id !== id) {
+        throw new ConflictException(`La sección "${limpio}" ya existe`);
+      }
+
+      seccion.nombre = limpio;
+      cambia = true;
+    }
+
+    if (cambios.padre_id !== undefined) {
+      if (cambios.padre_id === id) {
+        throw new BadRequestException('Una sección no puede ser su propia categoría principal');
+      }
+
+      const padre = await this.resolverPadre(cambios.padre_id);
+
+      if (padre) {
+        const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
+
+        if (hijas > 0) {
+          throw new BadRequestException(
+            `La sección "${seccion.nombre}" tiene ${hijas} subcategoría${hijas === 1 ? '' : 's'}: ` +
+              'no puede pasar a ser subcategoría',
+          );
+        }
+      }
+
+      seccion.padre_id = padre?.id ?? null;
+      cambia = true;
+    }
+
+    if (!cambia) {
+      throw new BadRequestException('No hay nada que actualizar: manda el nombre o la categoría principal');
+    }
+
+>>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
     const guardada = await this.seccionRepo.save(seccion);
 
     return { mensaje: 'Sección actualizada correctamente', seccion: guardada };
   }
 
   /**
+   * Resuelve la categoría principal de una sección, si se pidió una. Devuelve
+   * `null` cuando no hay padre (categoría principal).
+   *
+   * Reglas: tiene que existir **en este negocio** (un id ajeno es `404`, no un
+   * padre silencioso) y ser principal (no se admiten subcategorías de
+   * subcategorías).
+   */
+  private async resolverPadre(padreId?: number | null): Promise<Seccion | null> {
+    if (padreId === undefined || padreId === null) return null;
+
+    const padre = await this.seccionRepo.findOneBy({ id: padreId, negocio: this.config.clave });
+
+    if (!padre) throw new NotFoundException(`No existe la sección ${padreId}`);
+
+    if (padre.padre_id !== null) {
+      throw new BadRequestException(
+        `La sección "${padre.nombre}" ya es una subcategoría: no puede tener subcategorías dentro`,
+      );
+    }
+
+    return padre;
+  }
+
+  /**
    * Borra una sección **vacía**.
    *
-   * Si tiene productos se responde `409` con el número en vez de moverlos a
-   * escondidas: la base lo impediría igualmente (`producto.seccion_id` no tiene
-   * `onDelete`, así que el `DELETE` reventaría) y mandarlos a la sección de
-   * reserva los escondería de la tienda. Es el aviso que pide la propia entidad
-   * `Seccion` y es lo que permite decirle al panel qué hacer antes de borrar.
+   * Si tiene productos o subcategorías se responde `409` con el número en vez
+   * de moverlos a escondidas: la base lo impediría igualmente (`producto.seccion_id`
+   * y `seccion.padre_id` son claves foráneas sin `ON DELETE`), y mandarlos a la
+   * sección de reserva o dejar huérfanas las subcategorías escondería productos
+   * de la tienda. Es el aviso que permite decirle al panel qué hacer antes de
+   * borrar.
    */
   async eliminarSeccion(id: number) {
     const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
@@ -275,6 +390,15 @@ export class CatalogoService implements OnApplicationBootstrap {
     if (seccion.nombre === SECCION_RESERVADA) {
       throw new BadRequestException(
         `La sección "${SECCION_RESERVADA}" es la de reserva: no se puede borrar`,
+      );
+    }
+
+    const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
+
+    if (hijas > 0) {
+      throw new ConflictException(
+        `La sección "${seccion.nombre}" tiene ${hijas} subcategoría${hijas === 1 ? '' : 's'}: ` +
+          'bórralas o muévelas antes de borrarla',
       );
     }
 
@@ -386,6 +510,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       nombre: dulce.nombre,
       precio: dulce.precio,
       imagen_url: dulce.imagen_url,
+      descripcion: dulce.descripcion,
       moneda: dulce.moneda,
       // En `crearDulce` la relación recién asignada aún no ha rellenado la
       // columna: se cae al `.seccion?.id` si la columna no llegó.
@@ -434,6 +559,7 @@ export class CatalogoService implements OnApplicationBootstrap {
         negocio: this.config.clave,
         imagen_url: null,
         imagen_bytes: null,
+        descripcion: this.normalizarDescripcion(createDulceDto.descripcion),
         seccion,
       });
 
@@ -454,20 +580,30 @@ export class CatalogoService implements OnApplicationBootstrap {
   }
 
   /**
-   * Edición parcial. Se manda solo lo que cambia, y mandar los tres campos es
-   * válido: en ese caso los dos cambian.
+   * La descripción es opcional: se recorta y, si queda vacía, se guarda como
+   * null para que la vitrina sepa que no hay nada que enseñar.
+   */
+  private normalizarDescripcion(descripcion?: string | null): string | null {
+    const limpia = descripcion?.trim();
+    return limpia ? limpia : null;
+  }
+
+  /**
+   * Edición parcial. Se manda solo lo que cambia, y mandar todos los campos es
+   * válido: en ese caso cambian todos.
    */
   async actualizarDulce(id: number, updateDulceDto: UpdateDulceDto) {
-    const { nombre, precio, moneda, seccion_id } = updateDulceDto;
+    const { nombre, precio, moneda, descripcion, seccion_id } = updateDulceDto;
 
     if (
       nombre === undefined &&
       precio === undefined &&
       moneda === undefined &&
+      descripcion === undefined &&
       seccion_id === undefined
     ) {
       throw new BadRequestException(
-        'No hay nada que actualizar: manda "nombre", "precio", "moneda" o "seccion_id"',
+        'No hay nada que actualizar: manda "nombre", "precio", "moneda", "descripcion" o "seccion_id"',
       );
     }
 
@@ -478,6 +614,7 @@ export class CatalogoService implements OnApplicationBootstrap {
     if (nombre !== undefined) dulce.nombre = nombre.trim();
     if (precio !== undefined) dulce.precio = precio;
     if (moneda !== undefined) dulce.moneda = this.normalizarMoneda(moneda);
+    if (descripcion !== undefined) dulce.descripcion = this.normalizarDescripcion(descripcion);
 
     // Mover el producto entre secciones. La nueva sección tiene que ser de este
     // negocio (ver `crearDulce`); el DTO exige un id de sección positivo y no

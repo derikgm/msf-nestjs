@@ -11,6 +11,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
 import { InstalacionesYCombos1791900000000 } from './migraciones/1791900000000-InstalacionesYCombos.js';
+import { DescripcionProducto1791900000010 } from './migraciones/1791900000010-DescripcionProducto.js';
+import { Subcategorias1791900000020 } from './migraciones/1791900000020-Subcategorias.js';
 
 /**
  * N-6: opciones SSL de la conexión a Postgres.
@@ -81,7 +83,12 @@ function opcionesSsl(configService: ConfigService) {
          * Cómo se hacen los cambios de esquema: ver `src/data-source.ts`.
          */
         synchronize: false,
-        migrations: [Inicial1791390744944, InstalacionesYCombos1791900000000],
+        migrations: [
+          Inicial1791390744944,
+          InstalacionesYCombos1791900000000,
+          DescripcionProducto1791900000010,
+          Subcategorias1791900000020,
+        ],
         migrationsTableName: 'migrations',
         migrationsRun: true,
         // N-6: la verificación de la CA depende de `DB_CA_CERT` (ver
