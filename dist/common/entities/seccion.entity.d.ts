@@ -3,7 +3,7 @@ export declare class Seccion {
     nombre: string;
     negocio: string;
     parent_id: number | null;
-    padre: Seccion | null;
-    hijos: Seccion[];
+    padre?: Seccion | null;
+    hijos?: Seccion[];
     creado_en: Date;
 }

@@ -30,16 +30,16 @@ __decorate([
     __metadata("design:type", String)
 ], Seccion.prototype, "negocio", void 0);
 __decorate([
-    Column({ type: 'int', nullable: true, name: 'parent_id' }),
+    Column({ type: 'int', nullable: true, name: 'parent_id', default: null }),
     __metadata("design:type", Object)
 ], Seccion.prototype, "parent_id", void 0);
 __decorate([
-    ManyToOne(() => Seccion, (seccion) => seccion.hijos, { nullable: true, onDelete: 'SET NULL' }),
+    ManyToOne(() => Seccion, (seccion) => seccion.hijos, { nullable: true, onDelete: 'SET NULL', createForeignKeyConstraints: false }),
     JoinColumn({ name: 'parent_id' }),
     __metadata("design:type", Object)
 ], Seccion.prototype, "padre", void 0);
 __decorate([
-    OneToMany(() => Seccion, (seccion) => seccion.padre),
+    OneToMany(() => Seccion, (seccion) => seccion.padre, { createForeignKeyConstraints: false }),
     __metadata("design:type", Array)
 ], Seccion.prototype, "hijos", void 0);
 __decorate([

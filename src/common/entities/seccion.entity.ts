@@ -36,15 +36,15 @@ export class Seccion {
   @Column({ type: 'varchar', length: 16, default: 'delys' })
   negocio: string;
 
-  @Column({ type: 'int', nullable: true, name: 'parent_id' })
+  @Column({ type: 'int', nullable: true, name: 'parent_id', default: null })
   parent_id: number | null;
 
-  @ManyToOne(() => Seccion, (seccion) => seccion.hijos, { nullable: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => Seccion, (seccion) => seccion.hijos, { nullable: true, onDelete: 'SET NULL', createForeignKeyConstraints: false })
   @JoinColumn({ name: 'parent_id' })
-  padre: Seccion | null;
+  padre?: Seccion | null;
 
-  @OneToMany(() => Seccion, (seccion) => seccion.padre)
-  hijos: Seccion[];
+  @OneToMany(() => Seccion, (seccion) => seccion.padre, { createForeignKeyConstraints: false })
+  hijos?: Seccion[];
 
   @CreateDateColumn({ type: 'timestamptz' })
   creado_en: Date;
