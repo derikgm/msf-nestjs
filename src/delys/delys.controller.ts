@@ -74,6 +74,9 @@ export class DelysController {
   @Roles('delys')
   @Post('secciones')
   crearSeccion(@Body() createSeccionDto: CreateSeccionDto) {
+    // Delys no usa subcategorías: su catálogo es plano (solo publica dulces).
+    // Aunque el DTO acepte `padre_id`, aquí se ignora a propósito y la sección
+    // se crea siempre como principal.
     return this.catalogo.crearSeccion(createSeccionDto.nombre);
   }
 

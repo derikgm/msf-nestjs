@@ -689,25 +689,34 @@ El catálogo se navega por secciones (tabla `seccion`), y cada producto pertenec
 
 Los nombres se guardan en minúsculas (`Electronico` pasa a `electronico`) y deben ser únicos dentro de cada negocio.
 
+**Subcategorías**: una sección puede colgar de otra con `padre_id`. `null` es una categoría principal y un id es la categoría de la que cuelga. El árbol es de **un solo nivel** (el padre tiene que ser principal). Delys no las usa: su endpoint de alta las ignora y crea siempre secciones principales.
+
 #### 20.1. `GET /delys/secciones` y `GET /adc/secciones`
 
-Públicas. Devuelven las secciones del negocio, en orden de creación:
+Públicas. Devuelven las secciones del negocio, en orden de creación. Cada una trae `padre_id` (subcategorías):
 
 ```bash
 curl localhost:3000/delys/secciones
-# -> { "secciones": [ { "id": 2, "nombre": "dulces" } ] }
+# -> { "secciones": [ { "id": 2, "nombre": "dulces", "padre_id": null } ] }
 curl localhost:3000/adc/secciones
-# -> { "secciones": [ { "id": 4, "nombre": "electronico" } ] }
+# -> { "secciones": [
+#        { "id": 4, "nombre": "electrodomesticos", "padre_id": null },
+#        { "id": 8, "nombre": "neveras", "padre_id": 4 }
+#      ] }
 ```
 
 #### 20.2. `POST /delys/secciones` y `POST /adc/secciones`
 
-Alta desde el panel, con token del negocio (o `admin`, que entra a todo):
+Alta desde el panel, con token del negocio (o `admin`, que entra a todo). `padre_id` es opcional: con él se crea una **subcategoría**, sin él una categoría principal:
 
 ```bash
 curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" -d '{"nombre":"Electronico"}'
-# -> { "mensaje": "Sección creada correctamente", "seccion": { "id": 5, "nombre": "electronico", ... } }
+# -> { "mensaje": "Sección creada correctamente", "seccion": { "id": 5, "nombre": "electronico", "padre_id": null, ... } }
+
+curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" -d '{"nombre":"Neveras","padre_id":5}'
+# -> { "mensaje": "Sección creada correctamente", "seccion": { "id": 9, "nombre": "neveras", "padre_id": 5, ... } }
 ```
 
 | Situación | Respuesta |
@@ -715,7 +724,11 @@ curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
 | `nombre` vacío o de más de 60 letras | `400` |
 | nombre `dulces` (reservado) | `400`: `"dulces" es la sección reservada del catálogo heredado: elige otro nombre` |
 | sección repetida en el mismo negocio | `409`: `La sección "electronico" ya existe` |
+| `padre_id` de otro negocio (o inexistente) | `404`: `No existe la sección 4` |
+| `padre_id` de una subcategoría (segundo nivel) | `400`: `La sección "neveras" ya es una subcategoría: no puede tener subcategorías dentro` |
 | sin token / rol equivocado | `401` / `403` |
+
+`POST /delys/secciones` acepta el mismo DTO pero **ignora `padre_id`**: la pastelería no usa subcategorías.
 
 #### 20.3. Sección de un producto (`seccion_id`)
 
@@ -736,7 +749,8 @@ curl localhost:3000/adc/productos
 # -> {
 #      "productos": [ { "id": 7, "nombre": "Inversor 1500W", "precio": 18500, "moneda": "CUP",
 #                       "imagen_url": null, "seccion_id": 4, "seccion": "electronico" } ],
-#      "secciones": [ { "id": 4, "nombre": "electronico" } ]
+#      "secciones": [ { "id": 4, "nombre": "electrodomesticos", "padre_id": null },
+#                     { "id": 8, "nombre": "neveras", "padre_id": 4 } ]
 #    }
 ```
 
@@ -744,12 +758,16 @@ curl localhost:3000/adc/productos
 
 #### 20.5. `PATCH /adc/secciones/:id`
 
-Renombra una sección (solo ADC, con token `adc` o `admin`). El cuerpo es el mismo que en el alta: `{"nombre": "nuevo nombre"}`.
+Renombra una sección y/o la mueve de categoría (solo ADC, con token `adc` o `admin`). El cuerpo acepta `nombre` y/o `padre_id`; los dos son opcionales, pero uno tiene que venir. `padre_id: null` la convierte en categoría principal:
 
 ```bash
 curl -X PATCH localhost:3000/adc/secciones/4 -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" -d '{"nombre":"Paneles solares"}'
-# -> { "mensaje": "Sección actualizada correctamente", "seccion": { "id": 4, "nombre": "paneles solares", ... } }
+# -> { "mensaje": "Sección actualizada correctamente", "seccion": { "id": 4, "nombre": "paneles solares", "padre_id": null, ... } }
+
+curl -X PATCH localhost:3000/adc/secciones/8 -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" -d '{"padre_id": 4}'
+# -> { "mensaje": "Sección actualizada correctamente", "seccion": { "id": 8, "nombre": "neveras", "padre_id": 4, ... } }
 ```
 
 | Situación | Respuesta |
@@ -757,9 +775,13 @@ curl -X PATCH localhost:3000/adc/secciones/4 -H "Authorization: Bearer eyJ..." \
 | la sección no existe o es de otro negocio | `404`: `No existe la sección 4` |
 | nombre vacío o `dulces` (reservado) | `400` |
 | ya hay otra sección con ese nombre | `409`: `La sección "paneles solares" ya existe` |
+| `padre_id` de otro negocio (o inexistente) | `404`: `No existe la sección 4` |
+| `padre_id` de una subcategoría (segundo nivel) | `400` |
+| la sección tiene subcategorías y se intenta colgar de otra | `400`: `... tiene N subcategorías: no puede pasar a ser subcategoría` |
+| no llega ni `nombre` ni `padre_id` | `400`: `No hay nada que actualizar...` |
 | sin token / rol equivocado | `401` / `403` |
 
-El cambio se ve en la tienda en la siguiente lectura: `GET /adc/productos` agrupa por el nombre nuevo y los productos se quedan donde estaban (se mueven desde el panel con `PATCH /adc/productos/:id` y su `seccion_id`).
+El cambio se ve en la tienda en la siguiente lectura: `GET /adc/productos` devuelve el `padre_id` nuevo y los productos se quedan donde estaban (se mueven desde el panel con `PATCH /adc/productos/:id` y su `seccion_id`).
 
 #### 20.6. `DELETE /adc/secciones/:id`
 
@@ -774,10 +796,11 @@ curl -X DELETE localhost:3000/adc/secciones/4 -H "Authorization: Bearer eyJ..."
 | --- | --- |
 | la sección no existe o es de otro negocio | `404`: `No existe la sección 4` |
 | **tiene productos** | `409`: `La sección "paneles solares" tiene 3 productos: móvelos a otra sección antes de borrarla` |
+| **tiene subcategorías** | `409`: `La sección "electrodomesticos" tiene 2 subcategorías: bórralas o muévelas antes de borrarla` |
 | es la sección `dulces` (reservada) | `400`: `La sección "dulces" es la de reserva: no se puede borrar` |
 | sin token / rol equivocado | `401` / `403` |
 
-No se borra nada con productos dentro, ni se los manda a escondidas: `producto.seccion_id` es una clave foránea sin `ON DELETE`, así que la base lo rechazaría igual, y mandarlos a `dulces` los escondería de la tienda. Primero se reubican (`PATCH` con `seccion_id`) y después se borra la sección.
+No se borra nada con productos dentro, ni se los manda a escondidas: `producto.seccion_id` es una clave foránea sin `ON DELETE`, así que la base lo rechazaría igual, y mandarlos a `dulces` los escondería de la tienda. Primero se reubican (`PATCH` con `seccion_id`) y después se borra la sección. Lo mismo con las subcategorías: se borran o se mueven a principal (`PATCH` con `padre_id: null`) antes de borrar la categoría.
 
 ---
 

@@ -23,6 +23,7 @@ import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { UpdateInstalacionDto } from '../common/dto/update-instalacion.dto.js';
+import { UpdateSeccionDto } from '../common/dto/update-seccion.dto.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 let AdcController = class AdcController {
@@ -39,7 +40,11 @@ let AdcController = class AdcController {
         const { secciones } = await this.catalogo.listarSecciones();
         return {
             productos: dulces.map((dulce) => this.aProducto(dulce)),
-            secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+            secciones: secciones.map((seccion) => ({
+                id: seccion.id,
+                nombre: seccion.nombre,
+                padre_id: seccion.padre_id ?? null,
+            })),
         };
     }
     aProducto(dulce) {
@@ -67,14 +72,21 @@ let AdcController = class AdcController {
     async obtenerSecciones() {
         const { secciones } = await this.catalogo.listarSecciones();
         return {
-            secciones: secciones.map((seccion) => ({ id: seccion.id, nombre: seccion.nombre })),
+            secciones: secciones.map((seccion) => ({
+                id: seccion.id,
+                nombre: seccion.nombre,
+                padre_id: seccion.padre_id ?? null,
+            })),
         };
     }
     crearSeccion(createSeccionDto) {
-        return this.catalogo.crearSeccion(createSeccionDto.nombre);
+        return this.catalogo.crearSeccion(createSeccionDto.nombre, createSeccionDto.padre_id);
     }
-    actualizarSeccion(id, createSeccionDto) {
-        return this.catalogo.actualizarSeccion(id, createSeccionDto.nombre);
+    actualizarSeccion(id, updateSeccionDto) {
+        return this.catalogo.actualizarSeccion(id, {
+            nombre: updateSeccionDto.nombre,
+            padre_id: updateSeccionDto.padre_id,
+        });
     }
     eliminarSeccion(id) {
         return this.catalogo.eliminarSeccion(id);
@@ -170,7 +182,7 @@ __decorate([
     __param(0, Param('id', new ParseIntPipe())),
     __param(1, Body()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, CreateSeccionDto]),
+    __metadata("design:paramtypes", [Number, UpdateSeccionDto]),
     __metadata("design:returntype", void 0)
 ], AdcController.prototype, "actualizarSeccion", null);
 __decorate([

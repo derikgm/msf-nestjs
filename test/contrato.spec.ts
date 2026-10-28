@@ -62,8 +62,21 @@ const catalogoServiceMock = {
     ],
   })),
   listarSecciones: vi.fn(async () => ({
-    secciones: [{ id: 4, nombre: 'electronico' }],
+    secciones: [
+      { id: 4, nombre: 'electrodomesticos', padre_id: null },
+      { id: 8, nombre: 'neveras', padre_id: 4 },
+    ],
   })),
+  crearSeccion: vi.fn(async (nombre: string, padreId?: number | null) => ({
+    mensaje: 'Sección creada correctamente',
+    seccion: { id: 9, nombre, padre_id: padreId ?? null },
+  })),
+  actualizarSeccion: vi.fn(
+    async (id: number, cambios: { nombre?: string; padre_id?: number | null }) => ({
+      mensaje: 'Sección actualizada correctamente',
+      seccion: { id, nombre: cambios.nombre ?? 'neveras', padre_id: cambios.padre_id ?? null },
+    }),
+  ),
 };
 
 // La subida real va a Supabase Storage; aquí el servicio devuelve el contrato
@@ -201,6 +214,49 @@ describe('Contratos de la API (X-5, sin base de datos viva)', () => {
     // Proyección N-15: los campos internos no viajan en la API pública.
     expect(producto.imagen_bytes).toBeUndefined();
     expect(producto.negocio).toBeUndefined();
+
+    // Subcategorías: cada sección dice de cuál cuelga (`null` = principal).
+    expect(res.body.secciones).toEqual([
+      { id: 4, nombre: 'electrodomesticos', padre_id: null },
+      { id: 8, nombre: 'neveras', padre_id: 4 },
+    ]);
+  });
+
+  it('POST /adc/secciones crea una subcategoría cuando llega padre_id', async () => {
+    const token = await jwtService.signAsync({
+      sub: '11111111-1111-4111-8111-111111111111',
+      usuario: 'jefa',
+      rol: 'adc',
+    });
+
+    const res = await request(app.getHttpServer())
+      .post('/adc/secciones')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'neveras', padre_id: 4 });
+
+    expect(res.status).toBe(201);
+    expect(catalogoServiceMock.crearSeccion).toHaveBeenCalledWith('neveras', 4);
+    expect(res.body.seccion.padre_id).toBe(4);
+  });
+
+  it('PATCH /adc/secciones/:id puede mover la sección a principal con padre_id null', async () => {
+    const token = await jwtService.signAsync({
+      sub: '11111111-1111-4111-8111-111111111111',
+      usuario: 'jefa',
+      rol: 'adc',
+    });
+
+    const res = await request(app.getHttpServer())
+      .patch('/adc/secciones/8')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ padre_id: null });
+
+    expect(res.status).toBe(200);
+    expect(catalogoServiceMock.actualizarSeccion).toHaveBeenCalledWith(8, {
+      nombre: undefined,
+      padre_id: null,
+    });
+    expect(res.body.seccion.padre_id).toBeNull();
   });
 
   it('GET /adc/instalaciones devuelve las instalaciones, sin imagen_bytes ni creado_en', async () => {

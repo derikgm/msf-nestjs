@@ -7,9 +7,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min, } from 'class-validator';
 export class CreateSeccionDto {
     nombre;
+    padre_id;
 }
 __decorate([
     IsString({ message: 'El nombre de la sección tiene que ser texto' }),
@@ -17,4 +18,10 @@ __decorate([
     MaxLength(60, { message: 'El nombre de la sección no puede pasar de 60 letras' }),
     __metadata("design:type", String)
 ], CreateSeccionDto.prototype, "nombre", void 0);
+__decorate([
+    IsOptional(),
+    IsInt({ message: 'La categoría principal tiene que ser un número' }),
+    Min(1, { message: 'La categoría principal no es válida' }),
+    __metadata("design:type", Object)
+], CreateSeccionDto.prototype, "padre_id", void 0);
 //# sourceMappingURL=create-seccion.dto.js.map

@@ -7,6 +7,7 @@ import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { UpdateInstalacionDto } from '../common/dto/update-instalacion.dto.js';
+import { UpdateSeccionDto } from '../common/dto/update-seccion.dto.js';
 import type { RequestConUsuario } from '../auth/auth.interfaces.js';
 export declare class AdcController {
     private readonly catalogo;
@@ -27,6 +28,7 @@ export declare class AdcController {
         secciones: {
             id: number;
             nombre: string;
+            padre_id: number | null;
         }[];
     }>;
     private aProducto;
@@ -35,13 +37,14 @@ export declare class AdcController {
         secciones: {
             id: number;
             nombre: string;
+            padre_id: number | null;
         }[];
     }>;
     crearSeccion(createSeccionDto: CreateSeccionDto): Promise<{
         mensaje: string;
         seccion: import("../common/entities/seccion.entity.js").Seccion;
     }>;
-    actualizarSeccion(id: number, createSeccionDto: CreateSeccionDto): Promise<{
+    actualizarSeccion(id: number, updateSeccionDto: UpdateSeccionDto): Promise<{
         mensaje: string;
         seccion: import("../common/entities/seccion.entity.js").Seccion;
     }>;
