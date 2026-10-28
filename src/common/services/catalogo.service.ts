@@ -176,18 +176,9 @@ export class CatalogoService implements OnApplicationBootstrap {
    * que "Electronico" y "electronico" no acaben como dos secciones distintas. Una
    * sección repetida en el mismo negocio da `409` (la base lo impone con el
    * `UNIQUE(negocio, nombre)` y aquí se traduce a un mensaje claro).
-<<<<<<< HEAD
    * Ahora admite `parent_id` para crear subcategorías.
    */
   async crearSeccion(nombre: string, parent_id?: number | null) {
-=======
-   *
-   * Con `padre_id` se crea una **subcategoría**; sin él (o con `null`), una
-   * categoría principal. El padre tiene que ser una categoría principal del
-   * mismo negocio: el árbol es de un solo nivel.
-   */
-  async crearSeccion(nombre: string, padreId?: number | null) {
->>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
     const limpio = nombre.trim().toLowerCase();
     this.comprobarNombreDeSeccion(limpio);
 
@@ -195,7 +186,6 @@ export class CatalogoService implements OnApplicationBootstrap {
       throw new ConflictException(`La sección "${limpio}" ya existe`);
     }
 
-<<<<<<< HEAD
     let padre: Seccion | null = null;
     if (parent_id != null) {
       padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
@@ -210,24 +200,14 @@ export class CatalogoService implements OnApplicationBootstrap {
     }
 
     const guardada = await this.seccionRepo.save(
-      this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio, padre }),
-=======
-    const padre = await this.resolverPadre(padreId);
-
-    const guardada = await this.seccionRepo.save(
-      this.seccionRepo.create({
-        negocio: this.config.clave,
-        nombre: limpio,
-        padre_id: padre?.id ?? null,
-      }),
->>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
+      this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio, padre: padre ?? undefined }),
     );
 
     return { mensaje: 'Sección creada correctamente', seccion: guardada };
   }
 
   /**
-<<<<<<< HEAD
+
    * Cambia el nombre de una sección de este negocio (punto 2 del todo).
    * También permite cambiar/mover de categoría padre.
    */
@@ -235,24 +215,6 @@ export class CatalogoService implements OnApplicationBootstrap {
     const limpio = nombre.trim().toLowerCase();
     this.comprobarNombreDeSeccion(limpio);
 
-=======
-   * Cambia el nombre de una sección y/o la mueve de categoría (punto 2 del
-   * todo y subcategorías).
-   *
-   * Baja a minúsculas igual que en el alta, para que "Electronico" y
-   * "electronico" no acaben siendo dos secciones distintas, y pasa por la misma
-   * lista de nombres prohibidos. La sección se busca **dentro de este negocio**:
-   * el id de otro negocio responde `404`, no se renombra nada ajeno.
-   *
-   * `padre_id` es distinto de ausente: `null` la convierte en categoría
-   * principal, un número la cuelga de esa categoría. Una sección que ya tiene
-   * subcategorías no puede pasar a ser subcategoría (sería un segundo nivel).
-   */
-  async actualizarSeccion(
-    id: number,
-    cambios: { nombre?: string; padre_id?: number | null },
-  ) {
->>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
     const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
 
     if (!seccion) throw new NotFoundException(`No existe la sección ${id}`);
@@ -262,9 +224,11 @@ export class CatalogoService implements OnApplicationBootstrap {
       );
     }
 
-    let cambia = false;
+    const repetida = await this.seccionRepo.findOneBy({
+      negocio: this.config.clave,
+      nombre: limpio,
+    });
 
-<<<<<<< HEAD
     if (repetida && repetida.id !== id) {
       throw new ConflictException(`La sección "${limpio}" ya existe`);
     }
@@ -297,53 +261,6 @@ export class CatalogoService implements OnApplicationBootstrap {
       }
     }
 
-=======
-    if (cambios.nombre !== undefined) {
-      const limpio = cambios.nombre.trim().toLowerCase();
-      this.comprobarNombreDeSeccion(limpio);
-
-      const repetida = await this.seccionRepo.findOneBy({
-        negocio: this.config.clave,
-        nombre: limpio,
-      });
-
-      // La misma comprobación que en el alta, pero dejando pasar la propia fila:
-      // un rename que no cambia el nombre no es un error.
-      if (repetida && repetida.id !== id) {
-        throw new ConflictException(`La sección "${limpio}" ya existe`);
-      }
-
-      seccion.nombre = limpio;
-      cambia = true;
-    }
-
-    if (cambios.padre_id !== undefined) {
-      if (cambios.padre_id === id) {
-        throw new BadRequestException('Una sección no puede ser su propia categoría principal');
-      }
-
-      const padre = await this.resolverPadre(cambios.padre_id);
-
-      if (padre) {
-        const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
-
-        if (hijas > 0) {
-          throw new BadRequestException(
-            `La sección "${seccion.nombre}" tiene ${hijas} subcategoría${hijas === 1 ? '' : 's'}: ` +
-              'no puede pasar a ser subcategoría',
-          );
-        }
-      }
-
-      seccion.padre_id = padre?.id ?? null;
-      cambia = true;
-    }
-
-    if (!cambia) {
-      throw new BadRequestException('No hay nada que actualizar: manda el nombre o la categoría principal');
-    }
-
->>>>>>> 43cf044449fb9ac857216ec0873e0285760ccb13
     const guardada = await this.seccionRepo.save(seccion);
 
     return { mensaje: 'Sección actualizada correctamente', seccion: guardada };
@@ -364,7 +281,7 @@ export class CatalogoService implements OnApplicationBootstrap {
 
     if (!padre) throw new NotFoundException(`No existe la sección ${padreId}`);
 
-    if (padre.padre_id !== null) {
+    if (padre.parent_id !== null) {
       throw new BadRequestException(
         `La sección "${padre.nombre}" ya es una subcategoría: no puede tener subcategorías dentro`,
       );
@@ -378,7 +295,7 @@ export class CatalogoService implements OnApplicationBootstrap {
    *
    * Si tiene productos o subcategorías se responde `409` con el número en vez
    * de moverlos a escondidas: la base lo impediría igualmente (`producto.seccion_id`
-   * y `seccion.padre_id` son claves foráneas sin `ON DELETE`), y mandarlos a la
+   * y `seccion.parent_id` son claves foráneas sin `ON DELETE`), y mandarlos a la
    * sección de reserva o dejar huérfanas las subcategorías escondería productos
    * de la tienda. Es el aviso que permite decirle al panel qué hacer antes de
    * borrar.
@@ -393,7 +310,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       );
     }
 
-    const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
+    const hijas = await this.seccionRepo.count({ where: { parent_id: id } });
 
     if (hijas > 0) {
       throw new ConflictException(

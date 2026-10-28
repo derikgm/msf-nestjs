@@ -28,7 +28,7 @@ export declare class AdcController {
         secciones: {
             id: number;
             nombre: string;
-            padre_id: number | null;
+            padre_id: any;
         }[];
     }>;
     private aProducto;
@@ -37,7 +37,7 @@ export declare class AdcController {
         secciones: {
             id: number;
             nombre: string;
-            padre_id: number | null;
+            padre_id: any;
         }[];
     }>;
     crearSeccion(createSeccionDto: CreateSeccionDto): Promise<{

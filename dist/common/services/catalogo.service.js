@@ -83,59 +83,69 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
     async listarSecciones() {
         const secciones = await this.seccionRepo.find({
             where: { negocio: this.config.clave },
+            relations: { padre: true, hijos: true },
             order: { id: 'ASC' },
         });
         return { secciones };
     }
-    async crearSeccion(nombre, padreId) {
+    async crearSeccion(nombre, parent_id) {
         const limpio = nombre.trim().toLowerCase();
         this.comprobarNombreDeSeccion(limpio);
         if (await this.seccionRepo.existsBy({ negocio: this.config.clave, nombre: limpio })) {
             throw new ConflictException(`La sección "${limpio}" ya existe`);
         }
-        const padre = await this.resolverPadre(padreId);
-        const guardada = await this.seccionRepo.save(this.seccionRepo.create({
-            negocio: this.config.clave,
-            nombre: limpio,
-            padre_id: padre?.id ?? null,
-        }));
+        let padre = null;
+        if (parent_id != null) {
+            padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
+            if (!padre) {
+                throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
+            }
+            if (padre.nombre === SECCION_RESERVADA) {
+                throw new BadRequestException(`No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`);
+            }
+        }
+        const guardada = await this.seccionRepo.save(this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio, padre: padre ?? undefined }));
         return { mensaje: 'Sección creada correctamente', seccion: guardada };
     }
-    async actualizarSeccion(id, cambios) {
+    async actualizarSeccion(id, nombre, parent_id) {
+        const limpio = nombre.trim().toLowerCase();
+        this.comprobarNombreDeSeccion(limpio);
         const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
         if (!seccion)
             throw new NotFoundException(`No existe la sección ${id}`);
-        let cambia = false;
-        if (cambios.nombre !== undefined) {
-            const limpio = cambios.nombre.trim().toLowerCase();
-            this.comprobarNombreDeSeccion(limpio);
-            const repetida = await this.seccionRepo.findOneBy({
-                negocio: this.config.clave,
-                nombre: limpio,
-            });
-            if (repetida && repetida.id !== id) {
-                throw new ConflictException(`La sección "${limpio}" ya existe`);
-            }
-            seccion.nombre = limpio;
-            cambia = true;
+        if (seccion.nombre === SECCION_RESERVADA) {
+            throw new BadRequestException(`La sección "${SECCION_RESERVADA}" es la de reserva: no se puede renombrar`);
         }
-        if (cambios.padre_id !== undefined) {
-            if (cambios.padre_id === id) {
-                throw new BadRequestException('Una sección no puede ser su propia categoría principal');
+        const repetida = await this.seccionRepo.findOneBy({
+            negocio: this.config.clave,
+            nombre: limpio,
+        });
+        if (repetida && repetida.id !== id) {
+            throw new ConflictException(`La sección "${limpio}" ya existe`);
+        }
+        seccion.nombre = limpio;
+        if (parent_id !== undefined) {
+            if (parent_id === null) {
+                seccion.padre = null;
+                seccion.parent_id = null;
             }
-            const padre = await this.resolverPadre(cambios.padre_id);
-            if (padre) {
-                const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
-                if (hijas > 0) {
-                    throw new BadRequestException(`La sección "${seccion.nombre}" tiene ${hijas} subcategoría${hijas === 1 ? '' : 's'}: ` +
-                        'no puede pasar a ser subcategoría');
+            else {
+                if (parent_id === id) {
+                    throw new BadRequestException('Una sección no puede ser padre de sí misma');
                 }
+                const padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
+                if (!padre) {
+                    throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
+                }
+                if (padre.nombre === SECCION_RESERVADA) {
+                    throw new BadRequestException(`No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`);
+                }
+                if (padre.parent_id === id) {
+                    throw new BadRequestException('No se puede crear un ciclo entre categorías');
+                }
+                seccion.padre = padre;
+                seccion.parent_id = padre.id;
             }
-            seccion.padre_id = padre?.id ?? null;
-            cambia = true;
-        }
-        if (!cambia) {
-            throw new BadRequestException('No hay nada que actualizar: manda el nombre o la categoría principal');
         }
         const guardada = await this.seccionRepo.save(seccion);
         return { mensaje: 'Sección actualizada correctamente', seccion: guardada };
@@ -146,7 +156,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         const padre = await this.seccionRepo.findOneBy({ id: padreId, negocio: this.config.clave });
         if (!padre)
             throw new NotFoundException(`No existe la sección ${padreId}`);
-        if (padre.padre_id !== null) {
+        if (padre.parent_id !== null) {
             throw new BadRequestException(`La sección "${padre.nombre}" ya es una subcategoría: no puede tener subcategorías dentro`);
         }
         return padre;
@@ -158,7 +168,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         if (seccion.nombre === SECCION_RESERVADA) {
             throw new BadRequestException(`La sección "${SECCION_RESERVADA}" es la de reserva: no se puede borrar`);
         }
-        const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
+        const hijas = await this.seccionRepo.count({ where: { parent_id: id } });
         if (hijas > 0) {
             throw new ConflictException(`La sección "${seccion.nombre}" tiene ${hijas} subcategoría${hijas === 1 ? '' : 's'}: ` +
                 'bórralas o muévelas antes de borrarla');

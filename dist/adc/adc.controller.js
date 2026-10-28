@@ -43,7 +43,7 @@ let AdcController = class AdcController {
             secciones: secciones.map((seccion) => ({
                 id: seccion.id,
                 nombre: seccion.nombre,
-                padre_id: seccion.padre_id ?? null,
+                padre_id: seccion.padre_id ?? seccion.parent_id ?? null,
             })),
         };
     }
@@ -75,18 +75,15 @@ let AdcController = class AdcController {
             secciones: secciones.map((seccion) => ({
                 id: seccion.id,
                 nombre: seccion.nombre,
-                padre_id: seccion.padre_id ?? null,
+                padre_id: seccion.padre_id ?? seccion.parent_id ?? null,
             })),
         };
     }
     crearSeccion(createSeccionDto) {
-        return this.catalogo.crearSeccion(createSeccionDto.nombre, createSeccionDto.padre_id);
+        return this.catalogo.crearSeccion(createSeccionDto.nombre, createSeccionDto.parent_id);
     }
     actualizarSeccion(id, updateSeccionDto) {
-        return this.catalogo.actualizarSeccion(id, {
-            nombre: updateSeccionDto.nombre,
-            padre_id: updateSeccionDto.padre_id,
-        });
+        return this.catalogo.actualizarSeccion(id, updateSeccionDto.nombre ?? '', updateSeccionDto.parent_id ?? updateSeccionDto.padre_id);
     }
     eliminarSeccion(id) {
         return this.catalogo.eliminarSeccion(id);

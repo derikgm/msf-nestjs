@@ -44,7 +44,7 @@ let DelysController = class DelysController {
         return this.catalogo.listarSecciones();
     }
     crearSeccion(createSeccionDto) {
-        return this.catalogo.crearSeccion(createSeccionDto.nombre);
+        return this.catalogo.crearSeccion(createSeccionDto.nombre, createSeccionDto.parent_id);
     }
     crearDulce(createDulceDto) {
         return this.catalogo.crearDulce(createDulceDto);
