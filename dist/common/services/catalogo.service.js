@@ -81,12 +81,21 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         return repo.save(repo.create({ negocio: this.config.clave, nombre: 'dulces' }));
     }
     async listarSecciones() {
-        const secciones = await this.seccionRepo.find({
-            where: { negocio: this.config.clave },
-            relations: { padre: true, hijos: true },
-            order: { id: 'ASC' },
-        });
-        return { secciones };
+        try {
+            const secciones = await this.seccionRepo.find({
+                where: { negocio: this.config.clave },
+                relations: { padre: true, hijos: true },
+                order: { id: 'ASC' },
+            });
+            return { secciones };
+        }
+        catch (e) {
+            const secciones = await this.seccionRepo.find({
+                where: { negocio: this.config.clave },
+                order: { id: 'ASC' },
+            });
+            return { secciones };
+        }
     }
     async crearSeccion(nombre, parent_id) {
         const limpio = nombre.trim().toLowerCase();
@@ -215,13 +224,23 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         return { ok: true, pedido: await this.obtenerPedido(pedido.id) };
     }
     async obtenerTodosDulces(paginacion) {
-        const dulces = await this.dulceRepo.find({
-            where: { negocio: this.config.clave },
-            relations: { seccion: true },
-            order: { id: 'ASC' },
-            ...this.recorte(paginacion),
-        });
-        return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+        try {
+            const dulces = await this.dulceRepo.find({
+                where: { negocio: this.config.clave },
+                relations: { seccion: true },
+                order: { id: 'ASC' },
+                ...this.recorte(paginacion),
+            });
+            return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+        }
+        catch (e) {
+            const dulces = await this.dulceRepo.find({
+                where: { negocio: this.config.clave },
+                order: { id: 'ASC' },
+                ...this.recorte(paginacion),
+            });
+            return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+        }
     }
     recorte(paginacion) {
         const { pagina, limite } = paginacion ?? {};

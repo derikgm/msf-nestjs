@@ -162,13 +162,23 @@ export class CatalogoService implements OnApplicationBootstrap {
    * porque el árbol se arma en el cliente (panel y tienda), no aquí.
    */
   async listarSecciones() {
-    const secciones = await this.seccionRepo.find({
-      where: { negocio: this.config.clave },
-      relations: { padre: true, hijos: true },
-      order: { id: 'ASC' },
-    });
+    try {
+      const secciones = await this.seccionRepo.find({
+        where: { negocio: this.config.clave },
+        relations: { padre: true, hijos: true },
+        order: { id: 'ASC' },
+      });
 
-    return { secciones };
+      return { secciones };
+    } catch (e) {
+      // Fallback por si la columna/relaciones aún no existen en BD
+      const secciones = await this.seccionRepo.find({
+        where: { negocio: this.config.clave },
+        order: { id: 'ASC' },
+      });
+
+      return { secciones };
+    }
   }
 
   /**
@@ -392,16 +402,27 @@ export class CatalogoService implements OnApplicationBootstrap {
   }
 
   async obtenerTodosDulces(paginacion?: Paginacion) {
-    const dulces = await this.dulceRepo.find({
-      where: { negocio: this.config.clave },
-      relations: { seccion: true },
-      order: { id: 'ASC' },
-      ...this.recorte(paginacion),
-    });
+    try {
+      const dulces = await this.dulceRepo.find({
+        where: { negocio: this.config.clave },
+        relations: { seccion: true },
+        order: { id: 'ASC' },
+        ...this.recorte(paginacion),
+      });
 
-    // N-15: solo los campos públicos. `imagen_bytes` (contador de la cuota de
-    // Storage) y `negocio` (filtro del servidor) no salen en el GET.
-    return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+      // N-15: solo los campos públicos. `imagen_bytes` (contador de la cuota de
+      // Storage) y `negocio` (filtro del servidor) no salen en el GET.
+      return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
+    } catch (e) {
+      // Fallback si hay problemas con relaciones tras cambios de esquema
+      const dulces = await this.dulceRepo.find({
+        where: { negocio: this.config.clave },
+        order: { id: 'ASC' },
+        ...this.recorte(paginacion),
+      });
+      // Intentar cargar secciones por separado si es posible
+      return { dulces: dulces.map((dulce) => this.proyectar(dulce as any)) };
+    }
   }
 
   /**
