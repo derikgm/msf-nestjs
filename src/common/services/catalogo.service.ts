@@ -403,22 +403,34 @@ export class CatalogoService implements OnApplicationBootstrap {
     try {
       const dulces = await this.dulceRepo.find({
         where: { negocio: this.config.clave },
-        relations: { seccion: true },
         order: { id: 'ASC' },
         ...this.recorte(paginacion),
       });
+
+      // Cargar secciones por separado para evitar problemas de relaciones
+      const seccionIds = [...new Set(dulces.map((d) => d.seccion_id).filter((v): v is number => v != null))];
+      let seccionesMap = new Map<number, any>();
+      if (seccionIds.length > 0) {
+        try {
+          const secciones = await this.seccionRepo.findBy({ id: In(seccionIds) });
+          seccionesMap = new Map(secciones.map((s) => [s.id, s]));
+        } catch {}
+      }
+      for (const dulce of dulces as any) {
+        if (dulce.seccion_id && seccionesMap.has(dulce.seccion_id)) {
+          dulce.seccion = seccionesMap.get(dulce.seccion_id);
+        }
+      }
 
       // N-15: solo los campos públicos. `imagen_bytes` (contador de la cuota de
       // Storage) y `negocio` (filtro del servidor) no salen en el GET.
       return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
     } catch (e) {
-      // Fallback si hay problemas con relaciones tras cambios de esquema
       const dulces = await this.dulceRepo.find({
         where: { negocio: this.config.clave },
         order: { id: 'ASC' },
         ...this.recorte(paginacion),
       });
-      // Intentar cargar secciones por separado si es posible
       return { dulces: dulces.map((dulce) => this.proyectar(dulce as any)) };
     }
   }

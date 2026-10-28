@@ -226,10 +226,23 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         try {
             const dulces = await this.dulceRepo.find({
                 where: { negocio: this.config.clave },
-                relations: { seccion: true },
                 order: { id: 'ASC' },
                 ...this.recorte(paginacion),
             });
+            const seccionIds = [...new Set(dulces.map((d) => d.seccion_id).filter((v) => v != null))];
+            let seccionesMap = new Map();
+            if (seccionIds.length > 0) {
+                try {
+                    const secciones = await this.seccionRepo.findBy({ id: In(seccionIds) });
+                    seccionesMap = new Map(secciones.map((s) => [s.id, s]));
+                }
+                catch { }
+            }
+            for (const dulce of dulces) {
+                if (dulce.seccion_id && seccionesMap.has(dulce.seccion_id)) {
+                    dulce.seccion = seccionesMap.get(dulce.seccion_id);
+                }
+            }
             return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
         }
         catch (e) {
