@@ -129,7 +129,7 @@ export class AdcController {
   @Roles('adc')
   @Post('secciones')
   crearSeccion(@Body() createSeccionDto: CreateSeccionDto) {
-    return this.catalogo.crearSeccion(createSeccionDto.nombre);
+    return this.catalogo.crearSeccion(createSeccionDto.nombre, createSeccionDto.parent_id);
   }
 
   // Renombrar y borrar secciones (punto 2). El cuerpo del `PATCH` es la misma
@@ -142,7 +142,7 @@ export class AdcController {
     @Param('id', new ParseIntPipe()) id: number,
     @Body() createSeccionDto: CreateSeccionDto,
   ) {
-    return this.catalogo.actualizarSeccion(id, createSeccionDto.nombre);
+    return this.catalogo.actualizarSeccion(id, createSeccionDto.nombre, createSeccionDto.parent_id);
   }
 
   @Roles('adc')

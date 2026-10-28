@@ -74,7 +74,7 @@ export class DelysController {
   @Roles('delys')
   @Post('secciones')
   crearSeccion(@Body() createSeccionDto: CreateSeccionDto) {
-    return this.catalogo.crearSeccion(createSeccionDto.nombre);
+    return this.catalogo.crearSeccion(createSeccionDto.nombre, createSeccionDto.parent_id);
   }
 
   // Gestión del catálogo desde el panel de la pastelería. Estas tres rutas son

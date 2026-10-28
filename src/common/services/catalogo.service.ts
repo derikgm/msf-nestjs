@@ -158,6 +158,7 @@ export class CatalogoService implements OnApplicationBootstrap {
   async listarSecciones() {
     const secciones = await this.seccionRepo.find({
       where: { negocio: this.config.clave },
+      relations: { padre: true, hijos: true },
       order: { id: 'ASC' },
     });
 
@@ -169,8 +170,9 @@ export class CatalogoService implements OnApplicationBootstrap {
    * que "Electronico" y "electronico" no acaben como dos secciones distintas. Una
    * sección repetida en el mismo negocio da `409` (la base lo impone con el
    * `UNIQUE(negocio, nombre)` y aquí se traduce a un mensaje claro).
+   * Ahora admite `parent_id` para crear subcategorías.
    */
-  async crearSeccion(nombre: string) {
+  async crearSeccion(nombre: string, parent_id?: number | null) {
     const limpio = nombre.trim().toLowerCase();
     this.comprobarNombreDeSeccion(limpio);
 
@@ -178,8 +180,21 @@ export class CatalogoService implements OnApplicationBootstrap {
       throw new ConflictException(`La sección "${limpio}" ya existe`);
     }
 
+    let padre: Seccion | null = null;
+    if (parent_id != null) {
+      padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
+      if (!padre) {
+        throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
+      }
+      if (padre.nombre === SECCION_RESERVADA) {
+        throw new BadRequestException(
+          `No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`,
+        );
+      }
+    }
+
     const guardada = await this.seccionRepo.save(
-      this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio }),
+      this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio, padre }),
     );
 
     return { mensaje: 'Sección creada correctamente', seccion: guardada };
@@ -187,32 +202,58 @@ export class CatalogoService implements OnApplicationBootstrap {
 
   /**
    * Cambia el nombre de una sección de este negocio (punto 2 del todo).
-   *
-   * Baja a minúsculas igual que en el alta, para que "Electronico" y
-   * "electronico" no acaben siendo dos secciones distintas, y pasa por la misma
-   * lista de nombres prohibidos. La sección se busca **dentro de este negocio**:
-   * el id de otro negocio responde `404`, no se renombra nada ajeno.
+   * También permite cambiar/mover de categoría padre.
    */
-  async actualizarSeccion(id: number, nombre: string) {
+  async actualizarSeccion(id: number, nombre: string, parent_id?: number | null) {
     const limpio = nombre.trim().toLowerCase();
     this.comprobarNombreDeSeccion(limpio);
 
     const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
 
     if (!seccion) throw new NotFoundException(`No existe la sección ${id}`);
+    if (seccion.nombre === SECCION_RESERVADA) {
+      throw new BadRequestException(
+        `La sección "${SECCION_RESERVADA}" es la de reserva: no se puede renombrar`,
+      );
+    }
 
     const repetida = await this.seccionRepo.findOneBy({
       negocio: this.config.clave,
       nombre: limpio,
     });
 
-    // La misma comprobación que en el alta, pero dejando pasar la propia fila:
-    // un rename que no cambia el nombre no es un error.
     if (repetida && repetida.id !== id) {
       throw new ConflictException(`La sección "${limpio}" ya existe`);
     }
 
     seccion.nombre = limpio;
+
+    if (parent_id !== undefined) {
+      if (parent_id === null) {
+        seccion.padre = null;
+        seccion.parent_id = null;
+      } else {
+        if (parent_id === id) {
+          throw new BadRequestException('Una sección no puede ser padre de sí misma');
+        }
+        const padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
+        if (!padre) {
+          throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
+        }
+        if (padre.nombre === SECCION_RESERVADA) {
+          throw new BadRequestException(
+            `No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`,
+          );
+        }
+        // Evitar ciclos simples
+        if (padre.parent_id === id) {
+          throw new BadRequestException('No se puede crear un ciclo entre categorías');
+        }
+        seccion.padre = padre;
+        seccion.parent_id = padre.id;
+      }
+    }
+
     const guardada = await this.seccionRepo.save(seccion);
 
     return { mensaje: 'Sección actualizada correctamente', seccion: guardada };
