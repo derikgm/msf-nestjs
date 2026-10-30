@@ -24,14 +24,14 @@ export declare class CatalogoService implements OnApplicationBootstrap {
     listarSecciones(): Promise<{
         secciones: Seccion[];
     }>;
-    crearSeccion(nombre: string, parent_id?: number | null): Promise<{
-        mensaje: string;
-        seccion: Seccion[];
-    } | {
+    crearSeccion(nombre: string, padreId?: number | null): Promise<{
         mensaje: string;
         seccion: Seccion;
     }>;
-    actualizarSeccion(id: number, nombre: string, parent_id?: number | null): Promise<{
+    actualizarSeccion(id: number, cambios: {
+        nombre?: string;
+        padre_id?: number | null;
+    }): Promise<{
         mensaje: string;
         seccion: Seccion;
     }>;

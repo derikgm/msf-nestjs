@@ -2,6 +2,7 @@ export declare class Seccion {
     id: number;
     nombre: string;
     negocio: string;
-    parent_id?: number | null;
+    padre_id: number | null;
+    padre: Seccion | null;
     creado_en: Date;
 }

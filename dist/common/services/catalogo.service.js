@@ -81,78 +81,61 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         return repo.save(repo.create({ negocio: this.config.clave, nombre: 'dulces' }));
     }
     async listarSecciones() {
-        try {
-            const secciones = await this.seccionRepo.find({
-                where: { negocio: this.config.clave },
-                order: { id: 'ASC' },
-            });
-            return { secciones };
-        }
-        catch (e) {
-            const secciones = await this.seccionRepo.find({
-                where: { negocio: this.config.clave },
-                order: { id: 'ASC' },
-            });
-            return { secciones };
-        }
+        const secciones = await this.seccionRepo.find({
+            where: { negocio: this.config.clave },
+            order: { id: 'ASC' },
+        });
+        return { secciones };
     }
-    async crearSeccion(nombre, parent_id) {
+    async crearSeccion(nombre, padreId) {
         const limpio = nombre.trim().toLowerCase();
         this.comprobarNombreDeSeccion(limpio);
         if (await this.seccionRepo.existsBy({ negocio: this.config.clave, nombre: limpio })) {
             throw new ConflictException(`La sección "${limpio}" ya existe`);
         }
-        if (parent_id != null) {
-            const padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
-            if (!padre) {
-                throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
-            }
-            if (padre.nombre === SECCION_RESERVADA) {
-                throw new BadRequestException(`No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`);
-            }
-            const guardada = await this.seccionRepo.save(this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio, parent_id: parent_id }));
-            return { mensaje: 'Sección creada correctamente', seccion: guardada };
-        }
-        const guardada = await this.seccionRepo.save(this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio }));
+        const padre = await this.resolverPadre(padreId);
+        const guardada = await this.seccionRepo.save(this.seccionRepo.create({
+            negocio: this.config.clave,
+            nombre: limpio,
+            padre_id: padre?.id ?? null,
+        }));
         return { mensaje: 'Sección creada correctamente', seccion: guardada };
     }
-    async actualizarSeccion(id, nombre, parent_id) {
-        const limpio = nombre.trim().toLowerCase();
-        this.comprobarNombreDeSeccion(limpio);
+    async actualizarSeccion(id, cambios) {
         const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
         if (!seccion)
             throw new NotFoundException(`No existe la sección ${id}`);
-        if (seccion.nombre === SECCION_RESERVADA) {
-            throw new BadRequestException(`La sección "${SECCION_RESERVADA}" es la de reserva: no se puede renombrar`);
-        }
-        const repetida = await this.seccionRepo.findOneBy({
-            negocio: this.config.clave,
-            nombre: limpio,
-        });
-        if (repetida && repetida.id !== id) {
-            throw new ConflictException(`La sección "${limpio}" ya existe`);
-        }
-        seccion.nombre = limpio;
-        if (parent_id !== undefined) {
-            if (parent_id === null) {
-                seccion.parent_id = null;
+        let cambia = false;
+        if (cambios.nombre !== undefined) {
+            const limpio = cambios.nombre.trim().toLowerCase();
+            this.comprobarNombreDeSeccion(limpio);
+            const repetida = await this.seccionRepo.findOneBy({
+                negocio: this.config.clave,
+                nombre: limpio,
+            });
+            if (repetida && repetida.id !== id) {
+                throw new ConflictException(`La sección "${limpio}" ya existe`);
             }
-            else {
-                if (parent_id === id) {
-                    throw new BadRequestException('Una sección no puede ser padre de sí misma');
-                }
-                const padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
-                if (!padre) {
-                    throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
-                }
-                if (padre.nombre === SECCION_RESERVADA) {
-                    throw new BadRequestException(`No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`);
-                }
-                if (padre.parent_id === id) {
-                    throw new BadRequestException('No se puede crear un ciclo entre categorías');
-                }
-                seccion.parent_id = parent_id;
+            seccion.nombre = limpio;
+            cambia = true;
+        }
+        if (cambios.padre_id !== undefined) {
+            if (cambios.padre_id === id) {
+                throw new BadRequestException('Una sección no puede ser su propia categoría principal');
             }
+            const padre = await this.resolverPadre(cambios.padre_id);
+            if (padre) {
+                const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
+                if (hijas > 0) {
+                    throw new BadRequestException(`La sección "${seccion.nombre}" tiene ${hijas} subcategoría${hijas === 1 ? '' : 's'}: ` +
+                        'no puede pasar a ser subcategoría');
+                }
+            }
+            seccion.padre_id = padre?.id ?? null;
+            cambia = true;
+        }
+        if (!cambia) {
+            throw new BadRequestException('No hay nada que actualizar: manda el nombre o la categoría principal');
         }
         const guardada = await this.seccionRepo.save(seccion);
         return { mensaje: 'Sección actualizada correctamente', seccion: guardada };
@@ -163,7 +146,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         const padre = await this.seccionRepo.findOneBy({ id: padreId, negocio: this.config.clave });
         if (!padre)
             throw new NotFoundException(`No existe la sección ${padreId}`);
-        if (padre.parent_id !== null) {
+        if (padre.padre_id !== null) {
             throw new BadRequestException(`La sección "${padre.nombre}" ya es una subcategoría: no puede tener subcategorías dentro`);
         }
         return padre;
@@ -175,7 +158,7 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         if (seccion.nombre === SECCION_RESERVADA) {
             throw new BadRequestException(`La sección "${SECCION_RESERVADA}" es la de reserva: no se puede borrar`);
         }
-        const hijas = await this.seccionRepo.count({ where: { parent_id: id } });
+        const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
         if (hijas > 0) {
             throw new ConflictException(`La sección "${seccion.nombre}" tiene ${hijas} subcategoría${hijas === 1 ? '' : 's'}: ` +
                 'bórralas o muévelas antes de borrarla');
@@ -222,36 +205,13 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         return { ok: true, pedido: await this.obtenerPedido(pedido.id) };
     }
     async obtenerTodosDulces(paginacion) {
-        try {
-            const dulces = await this.dulceRepo.find({
-                where: { negocio: this.config.clave },
-                order: { id: 'ASC' },
-                ...this.recorte(paginacion),
-            });
-            const seccionIds = [...new Set(dulces.map((d) => d.seccion_id).filter((v) => v != null))];
-            let seccionesMap = new Map();
-            if (seccionIds.length > 0) {
-                try {
-                    const secciones = await this.seccionRepo.findBy({ id: In(seccionIds) });
-                    seccionesMap = new Map(secciones.map((s) => [s.id, s]));
-                }
-                catch { }
-            }
-            for (const dulce of dulces) {
-                if (dulce.seccion_id && seccionesMap.has(dulce.seccion_id)) {
-                    dulce.seccion = seccionesMap.get(dulce.seccion_id);
-                }
-            }
-            return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
-        }
-        catch (e) {
-            const dulces = await this.dulceRepo.find({
-                where: { negocio: this.config.clave },
-                order: { id: 'ASC' },
-                ...this.recorte(paginacion),
-            });
-            return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
-        }
+        const dulces = await this.dulceRepo.find({
+            where: { negocio: this.config.clave },
+            relations: { seccion: true },
+            order: { id: 'ASC' },
+            ...this.recorte(paginacion),
+        });
+        return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
     }
     recorte(paginacion) {
         const { pagina, limite } = paginacion ?? {};

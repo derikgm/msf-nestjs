@@ -84,7 +84,7 @@ export class AdcController {
         nombre: seccion.nombre,
         // Subcategorías: `null` es categoría principal y un id es la categoría
         // de la que cuelga. La web arma el árbol con esto.
-        padre_id: (seccion as any).padre_id ?? (seccion as any).parent_id ?? null,
+        padre_id: seccion.padre_id ?? null,
       })),
     };
   }
@@ -133,7 +133,7 @@ export class AdcController {
       secciones: secciones.map((seccion) => ({
         id: seccion.id,
         nombre: seccion.nombre,
-        padre_id: (seccion as any).padre_id ?? (seccion as any).parent_id ?? null,
+        padre_id: seccion.padre_id ?? null,
       })),
     };
   }
@@ -141,7 +141,10 @@ export class AdcController {
   @Roles('adc')
   @Post('secciones')
   crearSeccion(@Body() createSeccionDto: CreateSeccionDto) {
-    return this.catalogo.crearSeccion(createSeccionDto.nombre, createSeccionDto.parent_id);
+    return this.catalogo.crearSeccion(
+      createSeccionDto.nombre,
+      createSeccionDto.padre_id,
+    );
   }
 
   // Renombrar, mover de categoría y borrar secciones (punto 2 y subcategorías).
@@ -154,7 +157,10 @@ export class AdcController {
     @Param('id', new ParseIntPipe()) id: number,
     @Body() updateSeccionDto: UpdateSeccionDto,
   ) {
-    return this.catalogo.actualizarSeccion(id, updateSeccionDto.nombre ?? '', updateSeccionDto.parent_id ?? updateSeccionDto.padre_id);
+    return this.catalogo.actualizarSeccion(id, {
+      nombre: updateSeccionDto.nombre,
+      padre_id: updateSeccionDto.padre_id,
+    });
   }
 
   @Roles('adc')

@@ -7,12 +7,13 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique, } from 'typeorm';
 let Seccion = class Seccion {
     id;
     nombre;
     negocio;
-    parent_id;
+    padre_id;
+    padre;
     creado_en;
 };
 __decorate([
@@ -28,9 +29,14 @@ __decorate([
     __metadata("design:type", String)
 ], Seccion.prototype, "negocio", void 0);
 __decorate([
-    Column({ type: 'int', nullable: true, name: 'parent_id', default: null }),
+    Column({ type: 'int', nullable: true, name: 'padre_id' }),
     __metadata("design:type", Object)
-], Seccion.prototype, "parent_id", void 0);
+], Seccion.prototype, "padre_id", void 0);
+__decorate([
+    ManyToOne(() => Seccion, { nullable: true }),
+    JoinColumn({ name: 'padre_id' }),
+    __metadata("design:type", Object)
+], Seccion.prototype, "padre", void 0);
 __decorate([
     CreateDateColumn({ type: 'timestamptz' }),
     __metadata("design:type", Date)

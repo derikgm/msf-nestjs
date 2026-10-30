@@ -30,9 +30,6 @@ export declare class DelysController {
     }>;
     crearSeccion(createSeccionDto: CreateSeccionDto): Promise<{
         mensaje: string;
-        seccion: import("../common/entities/seccion.entity.js").Seccion[];
-    } | {
-        mensaje: string;
         seccion: import("../common/entities/seccion.entity.js").Seccion;
     }>;
     crearDulce(createDulceDto: CreateDulceDto): Promise<{

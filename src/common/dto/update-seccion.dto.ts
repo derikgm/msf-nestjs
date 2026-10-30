@@ -1,8 +1,11 @@
-import { IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 /**
- * Edición de una sección: renombrarla, moverla de categoría o las dos.
+ * Edición de una sección de ADC: renombrarla, moverla de categoría o las dos.
+ *
+ * Los dos campos son opcionales para que el panel mande solo lo que cambia.
+ * `padre_id: null` **mueve la sección a principal** (es distinto de no
+ * mandarlo). Si no llega ninguno, el servicio responde `400`.
  */
 export class UpdateSeccionDto {
   @IsOptional()
@@ -12,14 +15,7 @@ export class UpdateSeccionDto {
   nombre?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt({ message: 'parent_id tiene que ser un número entero' })
-  @IsPositive({ message: 'parent_id tiene que ser positivo' })
-  parent_id?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt({ message: 'padre_id tiene que ser un número entero' })
-  @IsPositive({ message: 'padre_id tiene que ser positivo' })
+  @IsInt({ message: 'La categoría principal tiene que ser un número' })
+  @Min(1, { message: 'La categoría principal no es válida' })
   padre_id?: number | null;
 }

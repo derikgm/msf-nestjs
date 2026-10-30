@@ -28,7 +28,7 @@ export declare class AdcController {
         secciones: {
             id: number;
             nombre: string;
-            padre_id: any;
+            padre_id: number | null;
         }[];
     }>;
     private aProducto;
@@ -37,13 +37,10 @@ export declare class AdcController {
         secciones: {
             id: number;
             nombre: string;
-            padre_id: any;
+            padre_id: number | null;
         }[];
     }>;
     crearSeccion(createSeccionDto: CreateSeccionDto): Promise<{
-        mensaje: string;
-        seccion: import("../common/entities/seccion.entity.js").Seccion[];
-    } | {
         mensaje: string;
         seccion: import("../common/entities/seccion.entity.js").Seccion;
     }>;

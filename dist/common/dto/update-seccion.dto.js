@@ -7,11 +7,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 export class UpdateSeccionDto {
     nombre;
-    parent_id;
     padre_id;
 }
 __decorate([
@@ -23,16 +21,8 @@ __decorate([
 ], UpdateSeccionDto.prototype, "nombre", void 0);
 __decorate([
     IsOptional(),
-    Type(() => Number),
-    IsInt({ message: 'parent_id tiene que ser un número entero' }),
-    IsPositive({ message: 'parent_id tiene que ser positivo' }),
-    __metadata("design:type", Object)
-], UpdateSeccionDto.prototype, "parent_id", void 0);
-__decorate([
-    IsOptional(),
-    Type(() => Number),
-    IsInt({ message: 'padre_id tiene que ser un número entero' }),
-    IsPositive({ message: 'padre_id tiene que ser positivo' }),
+    IsInt({ message: 'La categoría principal tiene que ser un número' }),
+    Min(1, { message: 'La categoría principal no es válida' }),
     __metadata("design:type", Object)
 ], UpdateSeccionDto.prototype, "padre_id", void 0);
 //# sourceMappingURL=update-seccion.dto.js.map

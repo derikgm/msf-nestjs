@@ -1,5 +1,11 @@
-import { IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 /**
  * Alta de una sección del catálogo, desde el panel del negocio.
@@ -10,9 +16,9 @@ import { Type } from 'class-transformer';
  * sin sección (ver `CatalogoService.seccionDulces()`), y permitirla desde el
  * panel mezclaría lo del sistema con lo del usuario.
  *
- * La misma forma sirve para el alta (`POST`) y para el renombrado
- * (`PATCH /adc/secciones/:id`): los dos mandan solo el nombre, pero ahora
- * también admite `parent_id` para crear subcategorías.
+ * `padre_id` (subcategorías) es opcional: sin él se crea una categoría
+ * principal; con el id de otra sección, una subcategoría. El servicio comprueba
+ * que el padre exista, sea del mismo negocio y sea principal (un solo nivel).
  */
 export class CreateSeccionDto {
   @IsString({ message: 'El nombre de la sección tiene que ser texto' })
@@ -21,8 +27,7 @@ export class CreateSeccionDto {
   nombre: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt({ message: 'parent_id tiene que ser un número entero' })
-  @IsPositive({ message: 'parent_id tiene que ser positivo' })
-  parent_id?: number | null;
+  @IsInt({ message: 'La categoría principal tiene que ser un número' })
+  @Min(1, { message: 'La categoría principal no es válida' })
+  padre_id?: number | null;
 }

@@ -162,21 +162,12 @@ export class CatalogoService implements OnApplicationBootstrap {
    * porque el árbol se arma en el cliente (panel y tienda), no aquí.
    */
   async listarSecciones() {
-    try {
-      const secciones = await this.seccionRepo.find({
-        where: { negocio: this.config.clave },
-        order: { id: 'ASC' },
-      });
+    const secciones = await this.seccionRepo.find({
+      where: { negocio: this.config.clave },
+      order: { id: 'ASC' },
+    });
 
-      return { secciones };
-    } catch (e) {
-      const secciones = await this.seccionRepo.find({
-        where: { negocio: this.config.clave },
-        order: { id: 'ASC' },
-      });
-
-      return { secciones };
-    }
+    return { secciones };
   }
 
   /**
@@ -184,9 +175,12 @@ export class CatalogoService implements OnApplicationBootstrap {
    * que "Electronico" y "electronico" no acaben como dos secciones distintas. Una
    * sección repetida en el mismo negocio da `409` (la base lo impone con el
    * `UNIQUE(negocio, nombre)` y aquí se traduce a un mensaje claro).
-   * Ahora admite `parent_id` para crear subcategorías.
+   *
+   * Con `padre_id` se crea una **subcategoría**; sin él (o con `null`), una
+   * categoría principal. El padre tiene que ser una categoría principal del
+   * mismo negocio: el árbol es de un solo nivel.
    */
-  async crearSeccion(nombre: string, parent_id?: number | null) {
+  async crearSeccion(nombre: string, padreId?: number | null) {
     const limpio = nombre.trim().toLowerCase();
     this.comprobarNombreDeSeccion(limpio);
 
@@ -194,80 +188,85 @@ export class CatalogoService implements OnApplicationBootstrap {
       throw new ConflictException(`La sección "${limpio}" ya existe`);
     }
 
-    if (parent_id != null) {
-      const padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
-      if (!padre) {
-        throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
-      }
-      if ((padre as any).nombre === SECCION_RESERVADA) {
-        throw new BadRequestException(
-          `No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`,
-        );
-      }
-      const guardada = await this.seccionRepo.save(
-        this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio, parent_id: parent_id } as any),
-      );
-
-      return { mensaje: 'Sección creada correctamente', seccion: guardada };
-    }
+    const padre = await this.resolverPadre(padreId);
 
     const guardada = await this.seccionRepo.save(
-      this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio }),
+      this.seccionRepo.create({
+        negocio: this.config.clave,
+        nombre: limpio,
+        padre_id: padre?.id ?? null,
+      }),
     );
 
     return { mensaje: 'Sección creada correctamente', seccion: guardada };
   }
 
   /**
-
-   * Cambia el nombre de una sección de este negocio (punto 2 del todo).
-   * También permite cambiar/mover de categoría padre.
+   * Cambia el nombre de una sección y/o la mueve de categoría (punto 2 del
+   * todo y subcategorías).
+   *
+   * Baja a minúsculas igual que en el alta, para que "Electronico" y
+   * "electronico" no acaben siendo dos secciones distintas, y pasa por la misma
+   * lista de nombres prohibidos. La sección se busca **dentro de este negocio**:
+   * el id de otro negocio responde `404`, no se renombra nada ajeno.
+   *
+   * `padre_id` es distinto de ausente: `null` la convierte en categoría
+   * principal, un número la cuelga de esa categoría. Una sección que ya tiene
+   * subcategorías no puede pasar a ser subcategoría (sería un segundo nivel).
    */
-  async actualizarSeccion(id: number, nombre: string, parent_id?: number | null) {
-    const limpio = nombre.trim().toLowerCase();
-    this.comprobarNombreDeSeccion(limpio);
-
+  async actualizarSeccion(
+    id: number,
+    cambios: { nombre?: string; padre_id?: number | null },
+  ) {
     const seccion = await this.seccionRepo.findOneBy({ id, negocio: this.config.clave });
 
     if (!seccion) throw new NotFoundException(`No existe la sección ${id}`);
-    if (seccion.nombre === SECCION_RESERVADA) {
-      throw new BadRequestException(
-        `La sección "${SECCION_RESERVADA}" es la de reserva: no se puede renombrar`,
-      );
+
+    let cambia = false;
+
+    if (cambios.nombre !== undefined) {
+      const limpio = cambios.nombre.trim().toLowerCase();
+      this.comprobarNombreDeSeccion(limpio);
+
+      const repetida = await this.seccionRepo.findOneBy({
+        negocio: this.config.clave,
+        nombre: limpio,
+      });
+
+      // La misma comprobación que en el alta, pero dejando pasar la propia fila:
+      // un rename que no cambia el nombre no es un error.
+      if (repetida && repetida.id !== id) {
+        throw new ConflictException(`La sección "${limpio}" ya existe`);
+      }
+
+      seccion.nombre = limpio;
+      cambia = true;
     }
 
-    const repetida = await this.seccionRepo.findOneBy({
-      negocio: this.config.clave,
-      nombre: limpio,
-    });
+    if (cambios.padre_id !== undefined) {
+      if (cambios.padre_id === id) {
+        throw new BadRequestException('Una sección no puede ser su propia categoría principal');
+      }
 
-    if (repetida && repetida.id !== id) {
-      throw new ConflictException(`La sección "${limpio}" ya existe`);
-    }
+      const padre = await this.resolverPadre(cambios.padre_id);
 
-    seccion.nombre = limpio;
+      if (padre) {
+        const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
 
-    if (parent_id !== undefined) {
-      if (parent_id === null) {
-        (seccion as any).parent_id = null;
-      } else {
-        if (parent_id === id) {
-          throw new BadRequestException('Una sección no puede ser padre de sí misma');
-        }
-        const padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
-        if (!padre) {
-          throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
-        }
-        if ((padre as any).nombre === SECCION_RESERVADA) {
+        if (hijas > 0) {
           throw new BadRequestException(
-            `No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`,
+            `La sección "${seccion.nombre}" tiene ${hijas} subcategoría${hijas === 1 ? '' : 's'}: ` +
+              'no puede pasar a ser subcategoría',
           );
         }
-        if ((padre as any).parent_id === id) {
-          throw new BadRequestException('No se puede crear un ciclo entre categorías');
-        }
-        (seccion as any).parent_id = parent_id;
       }
+
+      seccion.padre_id = padre?.id ?? null;
+      cambia = true;
+    }
+
+    if (!cambia) {
+      throw new BadRequestException('No hay nada que actualizar: manda el nombre o la categoría principal');
     }
 
     const guardada = await this.seccionRepo.save(seccion);
@@ -290,7 +289,7 @@ export class CatalogoService implements OnApplicationBootstrap {
 
     if (!padre) throw new NotFoundException(`No existe la sección ${padreId}`);
 
-    if (padre.parent_id !== null) {
+    if (padre.padre_id !== null) {
       throw new BadRequestException(
         `La sección "${padre.nombre}" ya es una subcategoría: no puede tener subcategorías dentro`,
       );
@@ -304,7 +303,7 @@ export class CatalogoService implements OnApplicationBootstrap {
    *
    * Si tiene productos o subcategorías se responde `409` con el número en vez
    * de moverlos a escondidas: la base lo impediría igualmente (`producto.seccion_id`
-   * y `seccion.parent_id` son claves foráneas sin `ON DELETE`), y mandarlos a la
+   * y `seccion.padre_id` son claves foráneas sin `ON DELETE`), y mandarlos a la
    * sección de reserva o dejar huérfanas las subcategorías escondería productos
    * de la tienda. Es el aviso que permite decirle al panel qué hacer antes de
    * borrar.
@@ -319,7 +318,7 @@ export class CatalogoService implements OnApplicationBootstrap {
       );
     }
 
-    const hijas = await this.seccionRepo.count({ where: { parent_id: id } });
+    const hijas = await this.seccionRepo.count({ where: { padre_id: id } });
 
     if (hijas > 0) {
       throw new ConflictException(
@@ -401,39 +400,16 @@ export class CatalogoService implements OnApplicationBootstrap {
   }
 
   async obtenerTodosDulces(paginacion?: Paginacion) {
-    try {
-      const dulces = await this.dulceRepo.find({
-        where: { negocio: this.config.clave },
-        order: { id: 'ASC' },
-        ...this.recorte(paginacion),
-      });
+    const dulces = await this.dulceRepo.find({
+      where: { negocio: this.config.clave },
+      relations: { seccion: true },
+      order: { id: 'ASC' },
+      ...this.recorte(paginacion),
+    });
 
-      // Cargar secciones por separado para evitar problemas de relaciones
-      const seccionIds = [...new Set(dulces.map((d) => d.seccion_id).filter((v): v is number => v != null))];
-      let seccionesMap = new Map<number, any>();
-      if (seccionIds.length > 0) {
-        try {
-          const secciones = await this.seccionRepo.findBy({ id: In(seccionIds) });
-          seccionesMap = new Map(secciones.map((s) => [s.id, s]));
-        } catch {}
-      }
-      for (const dulce of dulces as any) {
-        if (dulce.seccion_id && seccionesMap.has(dulce.seccion_id)) {
-          dulce.seccion = seccionesMap.get(dulce.seccion_id);
-        }
-      }
-
-      // N-15: solo los campos públicos. `imagen_bytes` (contador de la cuota de
-      // Storage) y `negocio` (filtro del servidor) no salen en el GET.
-      return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
-    } catch (e) {
-      const dulces = await this.dulceRepo.find({
-        where: { negocio: this.config.clave },
-        order: { id: 'ASC' },
-        ...this.recorte(paginacion),
-      });
-      return { dulces: dulces.map((dulce) => this.proyectar(dulce as any)) };
-    }
+    // N-15: solo los campos públicos. `imagen_bytes` (contador de la cuota de
+    // Storage) y `negocio` (filtro del servidor) no salen en el GET.
+    return { dulces: dulces.map((dulce) => this.proyectar(dulce)) };
   }
 
   /**

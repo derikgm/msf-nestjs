@@ -1,39 +1,24 @@
--- 004 · Subcategorías (categorías dentro de categorías)
+-- 004 · Subcategorías
 --
--- Añade `parent_id` a `seccion` para permitir jerarquía. Los productos siguen
--- asignándose a la sección/subcategoría final en `producto.seccion_id`.
+-- Una sección puede colgar de otra sección del mismo negocio:
+--   padre_id NULL  -> categoría principal
+--   padre_id val   -> subcategoría de esa categoría
 --
+-- Un solo nivel (el padre debe ser principal) lo garantiza el servidor al
+-- crear/editar, no la base. Idempotente: se puede aplicar más de una vez.
 
-ALTER TABLE seccion
-  ADD COLUMN IF NOT EXISTS parent_id integer;
+ALTER TABLE "seccion" ADD COLUMN IF NOT EXISTS "padre_id" integer;
+
+CREATE INDEX IF NOT EXISTS "IDX_seccion_padre_id" ON "seccion" ("padre_id");
 
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-     WHERE conrelid = 'seccion'::regclass
-       AND conname = 'fk_seccion_padre'
+    SELECT 1 FROM pg_constraint WHERE conname = 'FK_seccion_padre'
   ) THEN
-    ALTER TABLE seccion
-      ADD CONSTRAINT fk_seccion_padre
-      FOREIGN KEY (parent_id) REFERENCES seccion (id) ON DELETE SET NULL;
+    ALTER TABLE "seccion"
+      ADD CONSTRAINT "FK_seccion_padre"
+      FOREIGN KEY ("padre_id") REFERENCES "seccion" ("id")
+      ON DELETE NO ACTION;
   END IF;
 END $$;
-
--- Permitir mismo nombre bajo diferente padre
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM pg_constraint
-     WHERE conrelid = 'seccion'::regclass
-       AND conname = 'uq_seccion_negocio_nombre'
-  ) THEN
-    ALTER TABLE seccion DROP CONSTRAINT uq_seccion_negocio_nombre;
-  END IF;
-END $$;
-
-ALTER TABLE seccion
-  ADD CONSTRAINT uq_seccion_negocio_nombre_parent UNIQUE (negocio, nombre, parent_id);
-
--- Índice para búsquedas por padre
-CREATE INDEX IF NOT EXISTS idx_seccion_parent_id ON seccion (parent_id);
