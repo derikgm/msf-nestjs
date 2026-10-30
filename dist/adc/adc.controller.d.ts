@@ -42,6 +42,9 @@ export declare class AdcController {
     }>;
     crearSeccion(createSeccionDto: CreateSeccionDto): Promise<{
         mensaje: string;
+        seccion: import("../common/entities/seccion.entity.js").Seccion[];
+    } | {
+        mensaje: string;
         seccion: import("../common/entities/seccion.entity.js").Seccion;
     }>;
     actualizarSeccion(id: number, updateSeccionDto: UpdateSeccionDto): Promise<{

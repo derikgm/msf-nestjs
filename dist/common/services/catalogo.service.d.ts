@@ -26,6 +26,9 @@ export declare class CatalogoService implements OnApplicationBootstrap {
     }>;
     crearSeccion(nombre: string, parent_id?: number | null): Promise<{
         mensaje: string;
+        seccion: Seccion[];
+    } | {
+        mensaje: string;
         seccion: Seccion;
     }>;
     actualizarSeccion(id: number, nombre: string, parent_id?: number | null): Promise<{

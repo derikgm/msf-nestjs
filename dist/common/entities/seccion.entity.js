@@ -7,14 +7,12 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, Unique, } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
 let Seccion = class Seccion {
     id;
     nombre;
     negocio;
     parent_id;
-    padre;
-    hijos;
     creado_en;
 };
 __decorate([
@@ -34,21 +32,12 @@ __decorate([
     __metadata("design:type", Object)
 ], Seccion.prototype, "parent_id", void 0);
 __decorate([
-    ManyToOne(() => Seccion, (seccion) => seccion.hijos, { nullable: true, onDelete: 'SET NULL', createForeignKeyConstraints: false }),
-    JoinColumn({ name: 'parent_id' }),
-    __metadata("design:type", Object)
-], Seccion.prototype, "padre", void 0);
-__decorate([
-    OneToMany(() => Seccion, (seccion) => seccion.padre, { createForeignKeyConstraints: false }),
-    __metadata("design:type", Array)
-], Seccion.prototype, "hijos", void 0);
-__decorate([
     CreateDateColumn({ type: 'timestamptz' }),
     __metadata("design:type", Date)
 ], Seccion.prototype, "creado_en", void 0);
 Seccion = __decorate([
     Entity('seccion'),
-    Unique(['negocio', 'nombre', 'parent_id'])
+    Unique(['negocio', 'nombre'])
 ], Seccion);
 export { Seccion };
 //# sourceMappingURL=seccion.entity.js.map

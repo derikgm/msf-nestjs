@@ -194,21 +194,25 @@ export class CatalogoService implements OnApplicationBootstrap {
       throw new ConflictException(`La sección "${limpio}" ya existe`);
     }
 
-    let padre: Seccion | null = null;
     if (parent_id != null) {
-      padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
+      const padre = await this.seccionRepo.findOneBy({ id: parent_id, negocio: this.config.clave });
       if (!padre) {
         throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
       }
-      if (padre.nombre === SECCION_RESERVADA) {
+      if ((padre as any).nombre === SECCION_RESERVADA) {
         throw new BadRequestException(
           `No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`,
         );
       }
+      const guardada = await this.seccionRepo.save(
+        this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio, parent_id: parent_id } as any),
+      );
+
+      return { mensaje: 'Sección creada correctamente', seccion: guardada };
     }
 
     const guardada = await this.seccionRepo.save(
-      this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio, padre: padre ?? undefined }),
+      this.seccionRepo.create({ negocio: this.config.clave, nombre: limpio }),
     );
 
     return { mensaje: 'Sección creada correctamente', seccion: guardada };
@@ -245,8 +249,7 @@ export class CatalogoService implements OnApplicationBootstrap {
 
     if (parent_id !== undefined) {
       if (parent_id === null) {
-        seccion.padre = null;
-        seccion.parent_id = null;
+        (seccion as any).parent_id = null;
       } else {
         if (parent_id === id) {
           throw new BadRequestException('Una sección no puede ser padre de sí misma');
@@ -255,17 +258,15 @@ export class CatalogoService implements OnApplicationBootstrap {
         if (!padre) {
           throw new NotFoundException(`No existe la categoría padre ${parent_id}`);
         }
-        if (padre.nombre === SECCION_RESERVADA) {
+        if ((padre as any).nombre === SECCION_RESERVADA) {
           throw new BadRequestException(
             `No se pueden crear subcategorías bajo la sección "${SECCION_RESERVADA}"`,
           );
         }
-        // Evitar ciclos simples
-        if (padre.parent_id === id) {
+        if ((padre as any).parent_id === id) {
           throw new BadRequestException('No se puede crear un ciclo entre categorías');
         }
-        seccion.padre = padre;
-        seccion.parent_id = padre.id;
+        (seccion as any).parent_id = parent_id;
       }
     }
 
