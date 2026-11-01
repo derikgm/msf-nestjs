@@ -55,4 +55,35 @@ describe('entidades', () => {
     // La flecha sigue existiendo para que TypeORM lea los metadatos.
     expect(entidades.Combo).toBeTypeOf('function');
   });
+
+  /**
+   * Modelos de una publicación (la idea de Amazon). Aquí no se prueba la base
+   * de datos —eso lo hace la migración al arrancar—, sino que la entidad declare
+   * lo que la migración crea: si alguien cambia el tipo de `atributos` o quita
+   * el CASCADE, la tabla y el código se separan en silencio.
+   */
+  it('producto_modelo declara su ficha en jsonb y su CASCADE', () => {
+    const storage = getMetadataArgsStorage();
+    const tabla = storage.tables.find((t) => t.name === 'producto_modelo');
+    expect(tabla).toBeDefined();
+
+    const columnas = storage.columns.filter((c) => c.target === entidades.ProductoModelo);
+    const tipos = Object.fromEntries(
+      columnas.map((c) => [c.propertyName, c.options.type]),
+    );
+    expect(tipos).toMatchObject({
+      producto_id: 'int',
+      nombre: 'varchar',
+      precio: 'numeric',
+      moneda: 'varchar',
+      atributos: 'jsonb',
+    });
+    // La ficha nunca es null: una publicación sin características es `{}`.
+    expect(columnas.find((c) => c.propertyName === 'atributos')!.options.nullable).toBeFalsy();
+
+    const modelo = fuenteDe('producto-modelo.entity.ts');
+    expect(modelo).toContain("onDelete: 'CASCADE'");
+    // Un modelo huérfano del negocio es imposible: no hay columna `negocio`.
+    expect(modelo).not.toMatch(/^\s*negocio:/m);
+  });
 });

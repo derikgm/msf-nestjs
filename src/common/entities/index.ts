@@ -4,6 +4,7 @@ import { Dulce } from './dulce.entity.js';
 import { Encargo } from './encargo.entity.js';
 import { Instalacion } from './instalacion.entity.js';
 import { Pedido } from './pedido.entity.js';
+import { ProductoModelo } from './producto-modelo.entity.js';
 import { Seccion } from './seccion.entity.js';
 
 export { Combo } from './combo.entity.js';
@@ -12,6 +13,7 @@ export { Dulce } from './dulce.entity.js';
 export { Encargo } from './encargo.entity.js';
 export { Instalacion } from './instalacion.entity.js';
 export { Pedido } from './pedido.entity.js';
+export { ProductoModelo } from './producto-modelo.entity.js';
 export { Seccion } from './seccion.entity.js';
 
 export const entities = [
@@ -24,4 +26,6 @@ export const entities = [
   Instalacion,
   Combo,
   ComboDulce,
+  // Modelos de una publicación: la misma nevera en 240 L, 340 L y 420 L.
+  ProductoModelo,
 ];

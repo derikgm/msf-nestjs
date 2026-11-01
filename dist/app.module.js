@@ -19,6 +19,7 @@ import { Inicial1791390744944 } from './migraciones/1791390744944-Inicial.js';
 import { InstalacionesYCombos1791900000000 } from './migraciones/1791900000000-InstalacionesYCombos.js';
 import { DescripcionProducto1791900000010 } from './migraciones/1791900000010-DescripcionProducto.js';
 import { Subcategorias1791900000020 } from './migraciones/1791900000020-Subcategorias.js';
+import { ModelosDeProducto1791900000030 } from './migraciones/1791900000030-ModelosDeProducto.js';
 function opcionesSsl(configService) {
     if (configService.get('DB_SSL') === 'false')
         return false;
@@ -57,6 +58,7 @@ AppModule = __decorate([
                         InstalacionesYCombos1791900000000,
                         DescripcionProducto1791900000010,
                         Subcategorias1791900000020,
+                        ModelosDeProducto1791900000030,
                     ],
                     migrationsTableName: 'migrations',
                     migrationsRun: true,

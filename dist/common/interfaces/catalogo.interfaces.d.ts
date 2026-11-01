@@ -22,6 +22,15 @@ export interface Encargo {
     dulce: Dulce;
     cantidad: number;
 }
+export interface ProductoModelo {
+    id: number;
+    producto_id: number;
+    nombre: string;
+    precio: number;
+    moneda: string;
+    imagen_url: string | null;
+    atributos: Record<string, string>;
+}
 export interface Paginacion {
     pagina?: number;
     limite?: number;

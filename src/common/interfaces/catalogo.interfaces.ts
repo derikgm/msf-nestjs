@@ -50,6 +50,40 @@ export interface Encargo {
 }
 
 /**
+ * Un **modelo** dentro de una publicación (lo que Amazon llama variación de
+ * talla/color): la invernadero que se vende como «Nevera inverter» puede tener
+ * `240 L`, `340 L` y `420 L`, cada una con su precio, su foto y sus
+ * características.
+ *
+ * `producto` es la publicación y `producto_modelo` los modelos que se eligen
+ * en la web. Un producto sin modelos se sigue vendiendo igual que hoy: los
+ * modelos son opcionales.
+ *
+ * No lleva `negocio`: pertenece a un `producto`, y ese ya es de uno solo.
+ * Filtrar por negocio es responsabilidad de quien consulta, uniendo con la
+ * publicación (así no puede existir un modelo de ADC colgado de un dulce).
+ */
+export interface ProductoModelo {
+    id: number,
+    /** Publicación a la que pertenece: referencia a `producto.id`. */
+    producto_id: number,
+    /** Nombre corto del modelo: `240 L inverter`, `12 V / 100 Ah`… */
+    nombre: string,
+    precio: number,
+    /** Mismo criterio que `producto.moneda`: texto libre de hasta 8 letras. */
+    moneda: string,
+    /** Foto del modelo; null si el modelo no tiene foto (se usa la de la publicación). */
+    imagen_url: string | null,
+    /**
+     * Características escritas por el dueño, en pares `etiqueta: valor`
+     * (`{ "Peso": "38 kg", "Potencia": "120 W" }`). `jsonb` y no una tabla
+     * aparte: el orden de las claves lo fija Postgres, se busca sin JOIN y
+     * mañana puede entrar una característica nueva sin tocar el esquema.
+     */
+    atributos: Record<string, string>,
+}
+
+/**
  * Paginación opcional de los GET de catálogo (N-11). Solo corta cuando el
  * cliente manda los dos parámetros válidos; sin ellos (o con uno solo) se
  * devuelve **todo**, porque las vitrinas pintan el catálogo entero y no deben
