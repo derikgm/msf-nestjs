@@ -20,14 +20,17 @@ import { usuarioActual } from '../common/utils/auth.util.js';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService, type MulterFile } from '../common/services/dulce-imagen.service.js';
 import { InstalacionesService } from '../common/services/instalaciones.service.js';
-import type { DulcePublico } from '../common/interfaces/catalogo.interfaces.js';
+import { ModelosService } from '../common/services/modelos.service.js';
+import type { DulcePublico, ProductoModelo } from '../common/interfaces/catalogo.interfaces.js';
 import type { Instalacion as InstalacionShape } from '../common/interfaces/instalaciones-combos.interfaces.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
 import { CreateInstalacionDto } from '../common/dto/create-instalacion.dto.js';
+import { CreateModeloDto } from '../common/dto/create-modelo.dto.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { UpdateInstalacionDto } from '../common/dto/update-instalacion.dto.js';
+import { UpdateModeloDto } from '../common/dto/update-modelo.dto.js';
 import { UpdateSeccionDto } from '../common/dto/update-seccion.dto.js';
 import type { RequestConUsuario } from '../auth/auth.interfaces.js';
 import { Public } from '../auth/public.decorator.js';
@@ -56,6 +59,7 @@ export class AdcController {
     private readonly catalogo: CatalogoService,
     private readonly imagenService: DulceImagenService,
     private readonly instalaciones: InstalacionesService,
+    private readonly modelos: ModelosService,
   ) {}
 
   // Catálogo: público, sin token, igual que la vitrina de Delys. Devuelve los
@@ -76,9 +80,20 @@ export class AdcController {
   async obtenerProductos() {
     const { dulces } = await this.catalogo.obtenerTodosDulces();
     const { secciones } = await this.catalogo.listarSecciones();
+    // Los modelos de todas las publicaciones de una sola vez: si se pidieran
+    // uno por uno, la vitrina necesitaría tantas consultas como productos (y en
+    // un teléfono, tantas esperas). Una `IN` sobre los ids de esta página.
+    const modelosPorProducto = await this.modelos.porPublicaciones(
+      dulces.map((dulce) => dulce.id),
+    );
 
     return {
-      productos: dulces.map((dulce) => this.aProducto(dulce)),
+      productos: dulces.map((dulce) => ({
+        ...this.aProducto(dulce),
+        // `[]` cuando la publicación se vende sin modelos: la web y el panel no
+        // tienen que distinguir entre «sin modelos» y «no lo pregunté».
+        modelos: (modelosPorProducto.get(dulce.id) ?? []).map((modelo) => this.aModelo(modelo)),
+      })),
       secciones: secciones.map((seccion) => ({
         id: seccion.id,
         nombre: seccion.nombre,
@@ -120,6 +135,106 @@ export class AdcController {
       imagen_url: instalacion.imagen_url,
       descripcion: instalacion.descripcion,
     };
+  }
+
+  /**
+   * Modelo tal como se enseña en la API: sin `imagen_bytes` (contador interno de
+   * la cuota) ni `creado_en`, y sin `producto`: la relación se carga solo para
+   * comprobar el negocio y no debe viajar en la respuesta.
+   */
+  private aModelo(modelo: ProductoModelo) {
+    return {
+      id: modelo.id,
+      producto_id: modelo.producto_id,
+      nombre: modelo.nombre,
+      precio: modelo.precio,
+      moneda: modelo.moneda,
+      imagen_url: modelo.imagen_url,
+      atributos: modelo.atributos,
+    };
+  }
+
+  // --- Modelos de una publicación ---------------------------------------------
+  // Una publicación («nevera inverter») puede venderse en varios modelos, cada
+  // uno con su precio, su foto y su ficha. La lectura es pública porque la
+  // vitrina la pinta; la gestión exige el rol `adc`, como el catálogo.
+  @Public()
+  @SkipThrottle()
+  @Get('productos/:id/modelos')
+  async obtenerModelos(@Param('id', new ParseIntPipe()) id: number) {
+    const modelos = await this.modelos.porPublicacion(id);
+
+    return { modelos: modelos.map((modelo) => this.aModelo(modelo)) };
+  }
+
+  @Roles('adc')
+  @Post('productos/:id/modelos')
+  async crearModelo(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Body() createModeloDto: CreateModeloDto,
+  ) {
+    const { mensaje, modelo } = await this.modelos.crear(id, createModeloDto);
+
+    return { mensaje, modelo: this.aModelo(modelo) };
+  }
+
+  @Roles('adc')
+  @Patch('modelos/:id')
+  async actualizarModelo(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Body() updateModeloDto: UpdateModeloDto,
+  ) {
+    const { mensaje, modelo } = await this.modelos.actualizar(id, updateModeloDto);
+
+    return { mensaje, modelo: this.aModelo(modelo) };
+  }
+
+  @Roles('adc')
+  @Delete('modelos/:id')
+  eliminarModelo(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Req() request: RequestConUsuario,
+  ) {
+    return this.modelos.eliminar(id, usuarioActual(request));
+  }
+
+  // Foto del modelo. Va a la misma cuota y el mismo bucket que las fotos del
+  // catálogo; solo cambia la carpeta (`modelos/`).
+  @Roles('adc')
+  @Post('modelos/:id/imagen')
+  @UseInterceptors(interceptorDeImagen('imagen'))
+  async subirImagenModelo(
+    @Param('id', new ParseIntPipe()) id: number,
+    @UploadedFile() file: MulterFile | undefined,
+    @Req() request: RequestConUsuario,
+  ) {
+    if (!file) {
+      throw new BadRequestException(
+        'Falta el archivo. Envíalo como multipart/form-data en el campo "imagen"',
+      );
+    }
+
+    const { mensaje, modelo, cuota } = await this.modelos.subirImagen(
+      id,
+      file,
+      usuarioActual(request),
+    );
+
+    return { mensaje, modelo: this.aModelo(modelo), cuota };
+  }
+
+  @Roles('adc')
+  @Delete('modelos/:id/imagen')
+  async eliminarImagenModelo(
+    @Param('id', new ParseIntPipe()) id: number,
+    @Req() request: RequestConUsuario,
+  ) {
+    const { mensaje, modelo, cuota } = await this.modelos.eliminarImagen(
+      id,
+      usuarioActual(request),
+    );
+
+    return { mensaje, modelo: this.aModelo(modelo), cuota };
   }
 
   // Secciones de ADC: lectura pública para la vitrina y gestión desde el panel.

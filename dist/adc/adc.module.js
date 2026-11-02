@@ -11,6 +11,7 @@ import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
 import { ImagenService } from '../common/services/imagen.service.js';
 import { InstalacionesService } from '../common/services/instalaciones.service.js';
+import { ModelosService } from '../common/services/modelos.service.js';
 import { entities } from '../common/entities/index.js';
 import { StorageQuotaModule } from '../common/modules/storage-quota/storage-quota.module.js';
 import { SupabaseModule } from '../common/modules/supabase/supabase.module.js';
@@ -28,6 +29,7 @@ AdcModule = __decorate([
             DulceImagenService,
             ImagenService,
             InstalacionesService,
+            ModelosService,
         ],
     })
 ], AdcModule);

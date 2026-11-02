@@ -17,12 +17,15 @@ import { usuarioActual } from '../common/utils/auth.util.js';
 import { CatalogoService } from '../common/services/catalogo.service.js';
 import { DulceImagenService } from '../common/services/dulce-imagen.service.js';
 import { InstalacionesService } from '../common/services/instalaciones.service.js';
+import { ModelosService } from '../common/services/modelos.service.js';
 import { CreateDulceDto } from '../common/dto/create-dulce.dto.js';
 import { CreateInstalacionDto } from '../common/dto/create-instalacion.dto.js';
+import { CreateModeloDto } from '../common/dto/create-modelo.dto.js';
 import { CreatePedidoDto } from '../common/dto/create-pedido.dto.js';
 import { CreateSeccionDto } from '../common/dto/create-seccion.dto.js';
 import { UpdateDulceDto } from '../common/dto/update-dulce.dto.js';
 import { UpdateInstalacionDto } from '../common/dto/update-instalacion.dto.js';
+import { UpdateModeloDto } from '../common/dto/update-modelo.dto.js';
 import { UpdateSeccionDto } from '../common/dto/update-seccion.dto.js';
 import { Public } from '../auth/public.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -30,16 +33,22 @@ let AdcController = class AdcController {
     catalogo;
     imagenService;
     instalaciones;
-    constructor(catalogo, imagenService, instalaciones) {
+    modelos;
+    constructor(catalogo, imagenService, instalaciones, modelos) {
         this.catalogo = catalogo;
         this.imagenService = imagenService;
         this.instalaciones = instalaciones;
+        this.modelos = modelos;
     }
     async obtenerProductos() {
         const { dulces } = await this.catalogo.obtenerTodosDulces();
         const { secciones } = await this.catalogo.listarSecciones();
+        const modelosPorProducto = await this.modelos.porPublicaciones(dulces.map((dulce) => dulce.id));
         return {
-            productos: dulces.map((dulce) => this.aProducto(dulce)),
+            productos: dulces.map((dulce) => ({
+                ...this.aProducto(dulce),
+                modelos: (modelosPorProducto.get(dulce.id) ?? []).map((modelo) => this.aModelo(modelo)),
+            })),
             secciones: secciones.map((seccion) => ({
                 id: seccion.id,
                 nombre: seccion.nombre,
@@ -68,6 +77,43 @@ let AdcController = class AdcController {
             imagen_url: instalacion.imagen_url,
             descripcion: instalacion.descripcion,
         };
+    }
+    aModelo(modelo) {
+        return {
+            id: modelo.id,
+            producto_id: modelo.producto_id,
+            nombre: modelo.nombre,
+            precio: modelo.precio,
+            moneda: modelo.moneda,
+            imagen_url: modelo.imagen_url,
+            atributos: modelo.atributos,
+        };
+    }
+    async obtenerModelos(id) {
+        const modelos = await this.modelos.porPublicacion(id);
+        return { modelos: modelos.map((modelo) => this.aModelo(modelo)) };
+    }
+    async crearModelo(id, createModeloDto) {
+        const { mensaje, modelo } = await this.modelos.crear(id, createModeloDto);
+        return { mensaje, modelo: this.aModelo(modelo) };
+    }
+    async actualizarModelo(id, updateModeloDto) {
+        const { mensaje, modelo } = await this.modelos.actualizar(id, updateModeloDto);
+        return { mensaje, modelo: this.aModelo(modelo) };
+    }
+    eliminarModelo(id, request) {
+        return this.modelos.eliminar(id, usuarioActual(request));
+    }
+    async subirImagenModelo(id, file, request) {
+        if (!file) {
+            throw new BadRequestException('Falta el archivo. Envíalo como multipart/form-data en el campo "imagen"');
+        }
+        const { mensaje, modelo, cuota } = await this.modelos.subirImagen(id, file, usuarioActual(request));
+        return { mensaje, modelo: this.aModelo(modelo), cuota };
+    }
+    async eliminarImagenModelo(id, request) {
+        const { mensaje, modelo, cuota } = await this.modelos.eliminarImagen(id, usuarioActual(request));
+        return { mensaje, modelo: this.aModelo(modelo), cuota };
     }
     async obtenerSecciones() {
         const { secciones } = await this.catalogo.listarSecciones();
@@ -160,6 +206,62 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], AdcController.prototype, "obtenerProductos", null);
+__decorate([
+    Public(),
+    SkipThrottle(),
+    Get('productos/:id/modelos'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", Promise)
+], AdcController.prototype, "obtenerModelos", null);
+__decorate([
+    Roles('adc'),
+    Post('productos/:id/modelos'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __param(1, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, CreateModeloDto]),
+    __metadata("design:returntype", Promise)
+], AdcController.prototype, "crearModelo", null);
+__decorate([
+    Roles('adc'),
+    Patch('modelos/:id'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __param(1, Body()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, UpdateModeloDto]),
+    __metadata("design:returntype", Promise)
+], AdcController.prototype, "actualizarModelo", null);
+__decorate([
+    Roles('adc'),
+    Delete('modelos/:id'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __param(1, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", void 0)
+], AdcController.prototype, "eliminarModelo", null);
+__decorate([
+    Roles('adc'),
+    Post('modelos/:id/imagen'),
+    UseInterceptors(interceptorDeImagen('imagen')),
+    __param(0, Param('id', new ParseIntPipe())),
+    __param(1, UploadedFile()),
+    __param(2, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object, Object]),
+    __metadata("design:returntype", Promise)
+], AdcController.prototype, "subirImagenModelo", null);
+__decorate([
+    Roles('adc'),
+    Delete('modelos/:id/imagen'),
+    __param(0, Param('id', new ParseIntPipe())),
+    __param(1, Req()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:returntype", Promise)
+], AdcController.prototype, "eliminarImagenModelo", null);
 __decorate([
     Public(),
     SkipThrottle(),
@@ -331,7 +433,8 @@ AdcController = __decorate([
     Controller('adc'),
     __metadata("design:paramtypes", [CatalogoService,
         DulceImagenService,
-        InstalacionesService])
+        InstalacionesService,
+        ModelosService])
 ], AdcController);
 export { AdcController };
 //# sourceMappingURL=adc.controller.js.map
