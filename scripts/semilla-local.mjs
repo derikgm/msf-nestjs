@@ -170,7 +170,15 @@ async function asegurarProducto(negocio, dulce, rol) {
   const existente = productos.find((p) => p.nombre === dulce.nombre);
 
   if (existente) {
-    if (existente.seccion_id !== dulce.seccion_id) {
+    // `seccion_id: undefined` en la semilla no pide «sin sección»: la API mete el
+    // producto en la de defecto al crearlo, y `seccion_id` exige un entero, así
+    // que después ya no se puede desasignar. Se avisa en vez de mandar un PATCH
+    // que no cambiaría nada.
+    if (dulce.seccion_id === undefined) {
+      if (existente.seccion_id != null) {
+        nota('·', `"${dulce.nombre}" se quedó en la sección ${existente.seccion_id}: la API no desasigna`);
+      }
+    } else if (existente.seccion_id !== dulce.seccion_id) {
       await pedir(`${rutaAlta}/${existente.id}`, {
         metodo: 'PATCH',
         token: tokens[rol],
@@ -192,6 +200,32 @@ async function asegurarProducto(negocio, dulce, rol) {
   nota('+', `producto "${dulce.nombre}" creado con id ${creado.id}`);
 
   return creado.id;
+}
+
+/** Alta de los modelos que faltan en una publicación de ADC. */
+async function asegurarModelos(productoId, nombreProducto, modelos) {
+  const ruta = `/adc/productos/${productoId}/modelos`;
+  const actuales = (await pedir(ruta)).json.modelos ?? [];
+  let creados = 0;
+
+  for (const modelo of modelos) {
+    if (actuales.some((m) => m.nombre === modelo.nombre)) continue;
+
+    const r = await pedir(ruta, {
+      metodo: 'POST',
+      token: tokens.adc,
+      cuerpo: { ...modelo, moneda: modelo.moneda ?? 'USD' },
+    });
+
+    if (r.status >= 400) {
+      throw new Error(`No se pudo crear el modelo "${modelo.nombre}" (${r.status}): ${JSON.stringify(r.json)}`);
+    }
+
+    creados++;
+  }
+
+  if (creados) nota('+', `${creados} modelo(s) en "${nombreProducto}"`);
+  else nota('·', `"${nombreProducto}" ya tenía sus ${modelos.length} modelos`);
 }
 
 // ------------------------------------------------------------------- main ---
@@ -217,6 +251,36 @@ const PRODUCTOS_DELYS = [
   { nombre: 'Galletas de coco (docena)', precio: 120, moneda: 'CUP', seccion: 'de sobre' },
 ];
 
+/**
+ * Modelos de las publicaciones de ADC —es lo que pidió el cliente: una nevera no
+ * es un producto, es una publicación con 240 L, 340 L y 420 L cada uno con su
+ * precio y su ficha. Se siembra solo en ADC; Delys y las publicaciones sueltas
+ * siguen sin modelos, que es el caso que la vitrina también tiene que pintar.
+ *
+ * Solo se crean los que faltan (se busca por nombre dentro de la publicación, que
+ * es donde el `UNIQUE` los separa): renombrar un modelo a mano no hace que la
+ * semilla duplique nada ni borre lo que alguien editó.
+ */
+const MODELOS_ADC = {
+  'Nevera No Frost 250 L': [
+    { nombre: '240 L inverter', precio: 320, atributos: { Peso: '38 kg', Ruido: '41 dB', Garantía: '1 año' } },
+    { nombre: '340 L inverter', precio: 420, atributos: { Peso: '45 kg', Ruido: '42 dB', Garantía: '1 año' } },
+    { nombre: '420 L frost free', precio: 510, atributos: { Peso: '52 kg', Ruido: '44 dB' } },
+  ],
+  'Ventilador de pedestal': [
+    { nombre: '16 pulgadas', precio: 45, atributos: { Aspas: '3', Altura: '1,30 m' } },
+    { nombre: '18 pulgadas oscilante', precio: 58, atributos: { Aspas: '5', Altura: '1,45 m', Mando: 'no' } },
+  ],
+  'Panel solar 200 W': [
+    { nombre: '200 W flexible', precio: 140, atributos: { Peso: '5,4 kg', Celdas: 'Monocristalino' } },
+    { nombre: '200 W rígido', precio: 165, atributos: { Peso: '11 kg', Celdas: 'Monocristalino', Marco: 'Aluminio' } },
+  ],
+  'Batería EcoFlow Delta 3': [
+    { nombre: 'Delta 3 estándar', precio: 890, moneda: 'USD', atributos: { Capacidad: '1024 Wh', Salidas: 'AC 1800 W' } },
+    { nombre: 'Delta 3 + panel', precio: 1030, moneda: 'USD', atributos: { Capacidad: '1024 Wh', Salidas: 'AC 1800 W', 'Incluye': 'Panel 160 W' } },
+  ],
+};
+
 async function main() {
   const client = new pg.Client({ connectionString: leerDatabaseUrl() });
   await client.connect();
@@ -239,13 +303,27 @@ async function main() {
     }
   }
 
+  const idsPorNombreAdc = {};
+
   for (const p of PRODUCTOS_ADC) {
-    await asegurarProducto('adc', {
+    idsPorNombreAdc[p.nombre] = await asegurarProducto('adc', {
       nombre: p.nombre,
       precio: p.precio,
       moneda: p.moneda,
       seccion_id: p.seccion ? idsAdc[p.seccion] : undefined,
     }, 'adc');
+  }
+
+  // Las cuatro publicaciones con variantes; el resto (el breaker) se queda sin
+  // modelos a propósito, para probar también el caso de una sola versión.
+  for (const [nombreProducto, modelos] of Object.entries(MODELOS_ADC)) {
+    const id = idsPorNombreAdc[nombreProducto];
+
+    if (!id) {
+      throw new Error(`La semilla pide modelos de "${nombreProducto}" pero ese producto no está sembrado`);
+    }
+
+    await asegurarModelos(id, nombreProducto, modelos);
   }
 
   // Una instalación de ADC, para que el panel y la vitrina tengan dónde mirar.
@@ -348,6 +426,12 @@ async function main() {
       FROM producto GROUP BY negocio ORDER BY negocio
   `);
   const cuotas = await client.query('SELECT rol, limite_bytes FROM storage_quota ORDER BY rol');
+  const modelos = await client.query(`
+    SELECT count(*) AS n, count(DISTINCT m.producto_id) AS publicaciones
+      FROM producto_modelo m
+      JOIN producto p ON p.id = m.producto_id
+     WHERE p.negocio = 'adc'
+  `);
 
   console.log('\nSecciones por negocio:');
   for (const f of resumen.rows) {
@@ -357,6 +441,7 @@ async function main() {
   for (const f of productos.rows) {
     console.log(`  ${f.negocio}: ${f.n} (${f.sin_seccion} sin sección asignada)`);
   }
+  console.log(`Modelos de ADC: ${modelos.rows[0].n} en ${modelos.rows[0].publicaciones} publicación(es)`);
   console.log(`Cuotas de storage: ${cuotas.rows.map((f) => `${f.rol}=${f.limite_bytes}B`).join(', ') || '(ninguna)'}`);
   console.log(`\nLogués con cualquiera de estos usuarios y la contraseña "${PASS}": delys, adc, admin`);
 
