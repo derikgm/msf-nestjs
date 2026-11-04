@@ -910,6 +910,94 @@ El borrado responde `{ "mensaje": "Imagen eliminada", "combo": { ..., "imagen_ur
 
 ---
 
+### 22. Modelos de una publicación
+
+Una publicación del catálogo («nevera inverter») puede venderse en varias **variantes** —los «240 L / 340 L / 420 L» de toda la vida—, cada una con su precio, su foto y su ficha técnica. Es **solo de ADC**: Delys no la usa y no tiene estas rutas.
+
+Viven en su propia tabla, `producto_modelo`, enlazada a `producto` con `ON DELETE CASCADE`: **borrando la publicación se borran sus modelos**. Dos reglas de la tabla mandan:
+
+- `UNIQUE(producto_id, nombre)`: el mismo nombre puede repetirse en publicaciones distintas, nunca dentro de la misma.
+- `atributos` es un `jsonb` de pares `etiqueta: valor`. **`jsonb` no conserva el orden de escritura** (los reordena al guardarlos), así que quien necesite un orden en la web lo fija él, no la base.
+
+La lectura es pública (la vitrina la pinta); la gestión exige rol `adc` o `admin`, como el catálogo. **El negocio se resuelve por el padre**: un `producto_id` o un id de modelo que sea de Delys responde `404`, no `403`, para que la vitrina no delate qué publicaciones hay en el otro negocio.
+
+#### 22.1. `modelos` dentro de `GET /adc/productos`
+
+La lista del catálogo mete los modelos de cada producto en la misma respuesta, con **una sola consulta extra** para todo el catálogo:
+
+```bash
+curl localhost:3000/adc/productos
+# -> { "productos": [ { "id": 5, "nombre": "Nevera No Frost 250 L", "precio": 320, "moneda": "USD",
+#                       "seccion": "neveras", "seccion_id": 8,
+#                       "modelos": [ { "id": 16, "producto_id": 5, "nombre": "240 L inverter",
+#                                      "precio": 320, "moneda": "USD", "imagen_url": null,
+#                                      "atributos": { "Peso": "38 kg", "Ruido": "41 dB" } } ] } ],
+#      "secciones": [ ... ] }
+```
+
+`[]` cuando la publicación se vende sin modelos: la web y el panel no tienen que distinguir entre «sin modelos» y «no los pedí». Las rutas de gestión responden el modelo con la **misma forma** (`imagen_bytes`, `creado_en` y la relación `producto` se quedan fuera).
+
+#### 22.2. `GET /adc/productos/:id/modelos`
+
+Pública y exenta del límite de peticiones, para quien solo quiera los modelos de una publicación (en el orden de su `id`):
+
+```bash
+curl localhost:3000/adc/productos/5/modelos
+# -> { "modelos": [ { "id": 16, ... }, { "id": 17, ... } ] }
+```
+
+#### 22.3. `POST /adc/productos/:id/modelos`
+
+Alta desde el panel. La publicación va **en la URL**: el cuerpo no acepta `id` ni `producto_id` (el `ValidationPipe` los rechaza), para que nadie pueda colgar un modelo de una publicación a otra.
+
+```bash
+curl -X POST localhost:3000/adc/productos/5/modelos -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"240 L inverter","precio":320,"moneda":"USD","atributos":{"Peso":"38 kg","Ruido":"41 dB"}}'
+# -> { "mensaje": "Modelo creado", "modelo": { "id": 16, "producto_id": 5, ... } }
+```
+
+| Situación | Respuesta |
+| --- | --- |
+| `nombre` vacío o de más de 120 letras | `400` |
+| `precio` negativo, no numérico o con más de dos decimales | `400` |
+| `moneda` de más de 8 letras | `400`; vacía o ausente deja `CUP` (siempre en mayúsculas) |
+| `atributos` que no sea un objeto de texto | `400`: `Las características tienen que ser un objeto de "nombre": "valor"` |
+| una característica sin nombre, o sin valor | `400`; los pares totalmente vacíos se descartan sin quejarse |
+| nombre de característica de más de 40 letras, o valor de más de 120 | `400` |
+| más de 12 características | `400`: `Un modelo no puede tener más de 12 características` |
+| `id` de publicación inexistente o de **otro negocio** | `404`: `No existe el producto 5` |
+| nombre repetido en la misma publicación | `409`: `Este producto ya tiene un modelo llamado "240 L inverter"` |
+| sin token / rol equivocado | `401` / `403` |
+
+#### 22.4. `PATCH|DELETE /adc/modelos/:id`
+
+Edición y borrado por el id del **modelo** (no de la publicación):
+
+```bash
+curl -X PATCH localhost:3000/adc/modelos/16 -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" -d '{"precio":340,"atributos":{"Peso":"40 kg"}}'
+# -> { "mensaje": "Modelo actualizado", "modelo": { "id": 16, "precio": 340, ... } }
+
+curl -X DELETE localhost:3000/adc/modelos/16 -H "Authorization: Bearer eyJ..."
+# -> { "mensaje": "Modelo eliminado" }
+```
+
+Todos los campos son opcionales, pero uno tiene que venir: un `PATCH` vacío es `400` (`No mandaste ningún campo que cambiar`), igual que en el resto del catálogo. **`atributos` se reemplaza entero**, no se fusiona: para cambiar un par se manda la ficha completa. Un `id` de otro negocio responde `404`: `No existe el modelo 16`. Renombrar a un nombre ya usado por otro modelo de la misma publicación es `409`.
+
+#### 22.5. `POST|DELETE /adc/modelos/:id/imagen`
+
+Multipart con el campo **`imagen`**, la misma cuota y el mismo bucket que el catálogo; solo cambia la carpeta, que es `modelos/`:
+
+```bash
+curl -X POST localhost:3000/adc/modelos/16/imagen -H "Authorization: Bearer eyJ..." -F imagen=@nevera.png
+# -> { "mensaje": "Imagen subida correctamente", "modelo": { "id": 16, "imagen_url": "https://...", ... }, "cuota": { ... } }
+```
+
+Subir otra reemplaza la anterior (y devuelve sus bytes a la cuota); `DELETE` responde `{ "mensaje": "Imagen eliminada", "modelo": { ..., "imagen_url": null }, "cuota": { ... } }`. Sin archivo en el `POST` es `400`: `Falta el archivo. Envíalo como multipart/form-data en el campo "imagen"`. Los mismos topes de tipo y tamaño que las fotos del catálogo (API.md, sección 15).
+
+---
+
 ## Cómo probarlo de punta a punta
 
 ```bash
