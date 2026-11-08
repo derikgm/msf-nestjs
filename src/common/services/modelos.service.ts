@@ -3,14 +3,16 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { CreateModeloDto } from '../dto/create-modelo.dto.js';
 import { UpdateModeloDto } from '../dto/update-modelo.dto.js';
 import { NEGOCIO, type NegocioConfig } from '../config/negocio.config.js';
-import { Dulce, ProductoModelo } from '../entities/index.js';
+import { Dulce, Encargo, ProductoModelo } from '../entities/index.js';
 import { ImagenService, type MulterFile } from './imagen.service.js';
 import { StorageQuotaService } from './storage-quota.service.js';
 import type { AuthUser } from '../../auth/auth.interfaces.js';
@@ -38,6 +40,8 @@ const LIMITE_VALOR = 120;
  */
 @Injectable()
 export class ModelosService {
+  private readonly logger = new Logger(ModelosService.name);
+
   constructor(
     @Inject(NEGOCIO)
     private readonly config: NegocioConfig,
@@ -45,6 +49,12 @@ export class ModelosService {
     private readonly modeloRepo: Repository<ProductoModelo>,
     @Inject(getRepositoryToken(Dulce))
     private readonly dulceRepo: Repository<Dulce>,
+    /**
+     * Solo para el borrado: un modelo que está en un pedido no se puede quitar
+     * (ver `encargo.entity.ts`, la FK es `RESTRICT`).
+     */
+    @Inject(getRepositoryToken(Encargo))
+    private readonly encargoRepo: Repository<Encargo>,
     private readonly imagenes: ImagenService,
     private readonly cuota: StorageQuotaService,
   ) {}
@@ -129,8 +139,28 @@ export class ModelosService {
     return { mensaje: 'Modelo actualizado', modelo: guardado };
   }
 
+  /**
+   * Quita el modelo.
+   *
+   * Antes comprueba que ningún pedido lo lleva: `encargo.modelo_id` es FK con
+   * `RESTRICT` (ver `encargo.entity.ts`), y si se intentara borrar así, la base
+   * de datos respondería con un error de restricción que llega como `500`. El
+   * `409` de aquí dice cuántos pedidos lo bloquean, con el mismo criterio que
+   * `CatalogoService.eliminarDulce()`.
+   */
   async eliminar(id: number, caller: AuthUser) {
     const modelo = await this.modeloDe(id);
+
+    const pedidos = await this.pedidosQueLoPiden(modelo.id);
+
+    if (pedidos > 0) {
+      const plural = pedidos === 1 ? 'pedido' : 'pedidos';
+
+      throw new ConflictException(
+        `"${modelo.nombre}" está en ${pedidos} ${plural}. ` +
+          'Bórralos desde Pedidos y ya podrás quitar el modelo.',
+      );
+    }
 
     // Primero el archivo y la cuota, después la fila (ver `InstalacionesService`).
     await this.imagenes.liberarParaBorrar(modelo, caller.rol, `modelo ${id}`);
@@ -138,6 +168,28 @@ export class ModelosService {
     await this.modeloRepo.remove(modelo);
 
     return { mensaje: 'Modelo eliminado' };
+  }
+
+  /**
+   * Cuántos pedidos incluyen este modelo.
+   *
+   * Si la cuenta falla no se adivina un 0: se responde `503` y el modelo sigue
+   * ahí, porque perder el renglón de un pedido es peor que dejar un modelo
+   * publicado un rato (es `pedidosQuePiden()` de `CatalogoService`, misma razón).
+   */
+  private async pedidosQueLoPiden(modeloId: number): Promise<number> {
+    try {
+      return await this.encargoRepo
+        .createQueryBuilder('encargo')
+        .innerJoin('encargo.pedido', 'pedido')
+        .where('encargo.modelo_id = :modeloId', { modeloId })
+        .andWhere('pedido.negocio = :negocio', { negocio: this.config.clave })
+        .getCount();
+    } catch (error) {
+      this.logger.error(`No se pudo comprobar si el modelo ${modeloId} está en pedidos: ${error}`);
+
+      throw new ServiceUnavailableException('No se pudo comprobar los pedidos. Inténtalo de nuevo.');
+    }
   }
 
   /**

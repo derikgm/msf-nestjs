@@ -21,6 +21,9 @@ export interface Dulce {
 export interface Encargo {
     dulce: Dulce;
     cantidad: number;
+    modelo_id: number | null;
+    nombre_vendido: string | null;
+    precio_vendido: number | null;
 }
 export interface ProductoModelo {
     id: number;

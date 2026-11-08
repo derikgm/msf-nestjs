@@ -13,7 +13,7 @@ import { EntityManager, FindOptionsRelations, In, IsNull, Repository } from 'typ
 import { CreatePedidoDto } from '../dto/create-pedido.dto.js';
 import { CreateDulceDto } from '../dto/create-dulce.dto.js';
 import { UpdateDulceDto } from '../dto/update-dulce.dto.js';
-import { Dulce, Encargo, Pedido, Seccion } from '../entities/index.js';
+import { Dulce, Encargo, Pedido, ProductoModelo, Seccion } from '../entities/index.js';
 import type { DulcePublico, Paginacion } from '../interfaces/catalogo.interfaces.js';
 import { ofertas } from '../data/ofertas.js';
 import { NEGOCIO, type NegocioConfig } from '../config/negocio.config.js';
@@ -58,6 +58,13 @@ export class CatalogoService implements OnApplicationBootstrap {
     private readonly encargoRepo: Repository<Encargo>,
     @Inject(getRepositoryToken(Dulce))
     private readonly dulceRepo: Repository<Dulce>,
+    /**
+     * Los modelos de las publicaciones, solo para el alta de pedido: hace falta
+     * saber el precio real de lo que se lleva y dejarlo escrito. La gestión de
+     * modelos está en `ModelosService`.
+     */
+    @Inject(getRepositoryToken(ProductoModelo))
+    private readonly modeloRepo: Repository<ProductoModelo>,
     @Inject(getRepositoryToken(Seccion))
     private readonly seccionRepo: Repository<Seccion>,
     private readonly imagenes: DulceImagenService,
@@ -359,13 +366,20 @@ export class CatalogoService implements OnApplicationBootstrap {
   }
 
   /**
-   * Crea el pedido con los precios del catálogo. El cliente solo manda el id de
-   * cada dulce, así que el total no se puede manipular desde fuera.
+   * Crea el pedido con los precios del catálogo. El cliente manda el id de cada
+   * dulce y, si esa publicación se vende en modelos, cuál de ellos: el nombre y
+   * el precio nunca los escribe quien pide, se leen de la tabla.
+   *
+   * Cada renglón queda con su **instantánea** (`nombre_vendido`,
+   * `precio_vendido`), para que el histórico se pueda leer tal y como se vendió
+   * aunque mañana se renombre la publicación, baje de precio o se borre el
+   * modelo. `precio_total` sigue siendo lo que se cobró.
    */
   async crearPedido(createPedidoDto: CreatePedidoDto) {
     const { encargos: encargosDto } = createPedidoDto;
 
     const dulces = await this.dulcesDelCatalogo(encargosDto.map((e) => e.dulce));
+    const modelos = await this.modelosDeLosEncargos(encargosDto.map((e) => e.modelo));
 
     let precio_total = 0;
     const encargos: Encargo[] = encargosDto.map((encargoDto) => {
@@ -376,11 +390,34 @@ export class CatalogoService implements OnApplicationBootstrap {
       // undefined en vez de con un 404.
       if (!dulce) throw new NotFoundException(`No existe el ${this.config.articulo} ${encargoDto.dulce}`);
 
-      precio_total += dulce.precio * encargoDto.cantidad;
+      const modelo = encargoDto.modelo ? modelos.get(encargoDto.modelo) : undefined;
+
+      if (encargoDto.modelo && !modelo) {
+        throw new NotFoundException(`No existe el modelo ${encargoDto.modelo}`);
+      }
+
+      // El modelo tiene que ser de la publicación que se pide, si no se colaría
+      // un 420 L en el renglón de otra nevera. Hace falta comprobar solo la
+      // publicación: `dulces` ya vino filtrado por el negocio de esta instancia,
+      // así que un modelo de Delys nunca cuadra con un id de ADC y viceversa.
+      if (modelo && modelo.producto_id !== dulce.id) {
+        throw new BadRequestException(
+          `El modelo ${encargoDto.modelo} no es de "${dulce.nombre}"`,
+        );
+      }
+
+      // El precio real es el del modelo elegido; la publicación solo manda el
+      // «desde …» de las tarjetas, que no es lo que se lleva el cliente.
+      const precioUnitario = modelo ? modelo.precio : dulce.precio;
+
+      precio_total += precioUnitario * encargoDto.cantidad;
 
       return this.encargoRepo.create({
         dulce,
         cantidad: encargoDto.cantidad,
+        modelo_id: modelo?.id ?? null,
+        nombre_vendido: this.nombreVendido(dulce, modelo),
+        precio_vendido: precioUnitario,
       });
     });
 
@@ -694,5 +731,36 @@ export class CatalogoService implements OnApplicationBootstrap {
     }
 
     return porId;
+  }
+
+  /**
+   * Los modelos elegidos en los renglones, en **una** consulta. Sin `modelo` en
+   * ningún renglón se devuelve el mapa vacío sin ir a la base de datos: un
+   * `In([])` sale como `IN ()` y Postgres lo rechaza.
+   *
+   * No filtra por negocio a propósito: el negocio ya lo filtra quien llama, que
+   * compara `modelo.producto_id` con un dulce de su propio catálogo.
+   */
+  private async modelosDeLosEncargos(
+    ids: (number | undefined)[],
+  ): Promise<Map<number, ProductoModelo>> {
+    const pedidos = ids.filter((id): id is number => id !== undefined);
+
+    if (pedidos.length === 0) return new Map();
+
+    const encontrados = await this.modeloRepo.find({ where: { id: In(pedidos) } });
+
+    return new Map(encontrados.map((modelo) => [modelo.id, modelo]));
+  }
+
+  /**
+   * El texto que se congela en el renglón: la publicación y, si eligió modelo,
+   * el modelo detrás (`Nevera No Frost 250 L — 240 L inverter`). Recortado a las
+   * 200 letras de la columna, que da para dos nombres de 120 con su guion.
+   */
+  private nombreVendido(dulce: Dulce, modelo?: ProductoModelo): string {
+    const vendido = modelo ? `${dulce.nombre} — ${modelo.nombre}` : dulce.nombre;
+
+    return vendido.slice(0, 200);
   }
 }

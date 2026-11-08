@@ -1,6 +1,7 @@
 export declare class CreateEncargoDto {
     dulce: number;
     cantidad: number;
+    modelo?: number;
 }
 export declare class CreatePedidoDto {
     direccion: string;

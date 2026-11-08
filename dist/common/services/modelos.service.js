@@ -10,26 +10,30 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, } from '@nestjs/common';
+var ModelosService_1;
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException, } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { NEGOCIO } from '../config/negocio.config.js';
-import { Dulce, ProductoModelo } from '../entities/index.js';
+import { Dulce, Encargo, ProductoModelo } from '../entities/index.js';
 import { ImagenService } from './imagen.service.js';
 import { StorageQuotaService } from './storage-quota.service.js';
 const LIMITE_ATRIBUTOS = 12;
 const LIMITE_ETIQUETA = 40;
 const LIMITE_VALOR = 120;
-let ModelosService = class ModelosService {
+let ModelosService = ModelosService_1 = class ModelosService {
     config;
     modeloRepo;
     dulceRepo;
+    encargoRepo;
     imagenes;
     cuota;
-    constructor(config, modeloRepo, dulceRepo, imagenes, cuota) {
+    logger = new Logger(ModelosService_1.name);
+    constructor(config, modeloRepo, dulceRepo, encargoRepo, imagenes, cuota) {
         this.config = config;
         this.modeloRepo = modeloRepo;
         this.dulceRepo = dulceRepo;
+        this.encargoRepo = encargoRepo;
         this.imagenes = imagenes;
         this.cuota = cuota;
     }
@@ -86,9 +90,29 @@ let ModelosService = class ModelosService {
     }
     async eliminar(id, caller) {
         const modelo = await this.modeloDe(id);
+        const pedidos = await this.pedidosQueLoPiden(modelo.id);
+        if (pedidos > 0) {
+            const plural = pedidos === 1 ? 'pedido' : 'pedidos';
+            throw new ConflictException(`"${modelo.nombre}" está en ${pedidos} ${plural}. ` +
+                'Bórralos desde Pedidos y ya podrás quitar el modelo.');
+        }
         await this.imagenes.liberarParaBorrar(modelo, caller.rol, `modelo ${id}`);
         await this.modeloRepo.remove(modelo);
         return { mensaje: 'Modelo eliminado' };
+    }
+    async pedidosQueLoPiden(modeloId) {
+        try {
+            return await this.encargoRepo
+                .createQueryBuilder('encargo')
+                .innerJoin('encargo.pedido', 'pedido')
+                .where('encargo.modelo_id = :modeloId', { modeloId })
+                .andWhere('pedido.negocio = :negocio', { negocio: this.config.clave })
+                .getCount();
+        }
+        catch (error) {
+            this.logger.error(`No se pudo comprobar si el modelo ${modeloId} está en pedidos: ${error}`);
+            throw new ServiceUnavailableException('No se pudo comprobar los pedidos. Inténtalo de nuevo.');
+        }
     }
     async subirImagen(id, file, caller) {
         const modelo = await this.modeloDe(id);
@@ -175,12 +199,14 @@ let ModelosService = class ModelosService {
         throw new BadRequestException(`La característica "${etiqueta}" tiene que ser texto (por ejemplo "38 kg")`);
     }
 };
-ModelosService = __decorate([
+ModelosService = ModelosService_1 = __decorate([
     Injectable(),
     __param(0, Inject(NEGOCIO)),
     __param(1, Inject(getRepositoryToken(ProductoModelo))),
     __param(2, Inject(getRepositoryToken(Dulce))),
+    __param(3, Inject(getRepositoryToken(Encargo))),
     __metadata("design:paramtypes", [Object, Repository,
+        Repository,
         Repository,
         ImagenService,
         StorageQuotaService])

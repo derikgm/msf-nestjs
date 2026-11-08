@@ -14,7 +14,7 @@ var CatalogoService_1;
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException, } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
-import { Dulce, Encargo, Pedido, Seccion } from '../entities/index.js';
+import { Dulce, Encargo, Pedido, ProductoModelo, Seccion } from '../entities/index.js';
 import { ofertas } from '../data/ofertas.js';
 import { NEGOCIO } from '../config/negocio.config.js';
 import { DulceImagenService } from './dulce-imagen.service.js';
@@ -27,14 +27,16 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
     pedidoRepo;
     encargoRepo;
     dulceRepo;
+    modeloRepo;
     seccionRepo;
     imagenes;
     logger = new Logger(CatalogoService_1.name);
-    constructor(config, pedidoRepo, encargoRepo, dulceRepo, seccionRepo, imagenes) {
+    constructor(config, pedidoRepo, encargoRepo, dulceRepo, modeloRepo, seccionRepo, imagenes) {
         this.config = config;
         this.pedidoRepo = pedidoRepo;
         this.encargoRepo = encargoRepo;
         this.dulceRepo = dulceRepo;
+        this.modeloRepo = modeloRepo;
         this.seccionRepo = seccionRepo;
         this.imagenes = imagenes;
     }
@@ -182,15 +184,27 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
     async crearPedido(createPedidoDto) {
         const { encargos: encargosDto } = createPedidoDto;
         const dulces = await this.dulcesDelCatalogo(encargosDto.map((e) => e.dulce));
+        const modelos = await this.modelosDeLosEncargos(encargosDto.map((e) => e.modelo));
         let precio_total = 0;
         const encargos = encargosDto.map((encargoDto) => {
             const dulce = dulces.get(encargoDto.dulce);
             if (!dulce)
                 throw new NotFoundException(`No existe el ${this.config.articulo} ${encargoDto.dulce}`);
-            precio_total += dulce.precio * encargoDto.cantidad;
+            const modelo = encargoDto.modelo ? modelos.get(encargoDto.modelo) : undefined;
+            if (encargoDto.modelo && !modelo) {
+                throw new NotFoundException(`No existe el modelo ${encargoDto.modelo}`);
+            }
+            if (modelo && modelo.producto_id !== dulce.id) {
+                throw new BadRequestException(`El modelo ${encargoDto.modelo} no es de "${dulce.nombre}"`);
+            }
+            const precioUnitario = modelo ? modelo.precio : dulce.precio;
+            precio_total += precioUnitario * encargoDto.cantidad;
             return this.encargoRepo.create({
                 dulce,
                 cantidad: encargoDto.cantidad,
+                modelo_id: modelo?.id ?? null,
+                nombre_vendido: this.nombreVendido(dulce, modelo),
+                precio_vendido: precioUnitario,
             });
         });
         const pedido = await this.pedidoRepo.save(this.pedidoRepo.create({
@@ -380,6 +394,17 @@ let CatalogoService = CatalogoService_1 = class CatalogoService {
         }
         return porId;
     }
+    async modelosDeLosEncargos(ids) {
+        const pedidos = ids.filter((id) => id !== undefined);
+        if (pedidos.length === 0)
+            return new Map();
+        const encontrados = await this.modeloRepo.find({ where: { id: In(pedidos) } });
+        return new Map(encontrados.map((modelo) => [modelo.id, modelo]));
+    }
+    nombreVendido(dulce, modelo) {
+        const vendido = modelo ? `${dulce.nombre} — ${modelo.nombre}` : dulce.nombre;
+        return vendido.slice(0, 200);
+    }
 };
 CatalogoService = CatalogoService_1 = __decorate([
     Injectable(),
@@ -387,8 +412,10 @@ CatalogoService = CatalogoService_1 = __decorate([
     __param(1, Inject(getRepositoryToken(Pedido))),
     __param(2, Inject(getRepositoryToken(Encargo))),
     __param(3, Inject(getRepositoryToken(Dulce))),
-    __param(4, Inject(getRepositoryToken(Seccion))),
+    __param(4, Inject(getRepositoryToken(ProductoModelo))),
+    __param(5, Inject(getRepositoryToken(Seccion))),
     __metadata("design:paramtypes", [Object, Repository,
+        Repository,
         Repository,
         Repository,
         Repository,

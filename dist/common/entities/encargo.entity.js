@@ -8,12 +8,18 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { numericTransformer } from '../utils/numeric.transformer.js';
 import { Dulce } from './dulce.entity.js';
+import { ProductoModelo } from './producto-modelo.entity.js';
 import { Pedido } from './pedido.entity.js';
 let Encargo = class Encargo {
     id;
     dulce;
     cantidad;
+    modelo_id;
+    modelo;
+    nombre_vendido;
+    precio_vendido;
     pedido;
 };
 __decorate([
@@ -29,6 +35,29 @@ __decorate([
     Column({ type: 'int' }),
     __metadata("design:type", Number)
 ], Encargo.prototype, "cantidad", void 0);
+__decorate([
+    Column({ type: 'int', nullable: true, name: 'modelo_id' }),
+    __metadata("design:type", Object)
+], Encargo.prototype, "modelo_id", void 0);
+__decorate([
+    ManyToOne(() => ProductoModelo, { onDelete: 'RESTRICT', nullable: true }),
+    JoinColumn({ name: 'modelo_id' }),
+    __metadata("design:type", Object)
+], Encargo.prototype, "modelo", void 0);
+__decorate([
+    Column({ type: 'varchar', length: 200, nullable: true }),
+    __metadata("design:type", Object)
+], Encargo.prototype, "nombre_vendido", void 0);
+__decorate([
+    Column({
+        type: 'numeric',
+        precision: 12,
+        scale: 2,
+        nullable: true,
+        transformer: numericTransformer,
+    }),
+    __metadata("design:type", Object)
+], Encargo.prototype, "precio_vendido", void 0);
 __decorate([
     ManyToOne(() => Pedido, { onDelete: 'CASCADE', nullable: false }),
     JoinColumn({ name: 'pedido_id' }),

@@ -13,6 +13,7 @@ import { IsFechaDeEntrega } from '../utils/fecha.util.js';
 export class CreateEncargoDto {
     dulce;
     cantidad;
+    modelo;
 }
 __decorate([
     IsInt(),
@@ -25,6 +26,12 @@ __decorate([
     Max(999),
     __metadata("design:type", Number)
 ], CreateEncargoDto.prototype, "cantidad", void 0);
+__decorate([
+    IsOptional(),
+    IsInt(),
+    IsPositive(),
+    __metadata("design:type", Number)
+], CreateEncargoDto.prototype, "modelo", void 0);
 export class CreatePedidoDto {
     direccion;
     telefono;

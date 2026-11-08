@@ -47,6 +47,25 @@ export interface Dulce {
 export interface Encargo {
     dulce: Dulce,
     cantidad: number,
+    /**
+     * Qué modelo de la publicación se llevaron (`producto_modelo.id`). Null
+     * cuando se pidió una publicación sin modelos **y** en los renglones creados
+     * antes de que existiera la columna: el histórico no puede distinguirlos,
+     * así que lo que resuelve es `nombre_vendido`.
+     */
+    modelo_id: number | null,
+    /**
+     * Cómo se escribió el renglón aquel día: `Nevera No Frost 250 L — 240 L
+     * inverter`. Se guarda porque el catálogo se puede renombrar, y un pedido de
+     * hace seis meses no debe cambiar de significado al hacerlo.
+     */
+    nombre_vendido: string | null,
+    /**
+     * Precio **unitario** de aquel día, con la moneda del catálogo. Lo que se
+     * cobró sigue estando en `pedido.precio_total`; esto es lo que sobra para
+     * poder rehacer la cuenta.
+     */
+    precio_vendido: number | null,
 }
 
 /**

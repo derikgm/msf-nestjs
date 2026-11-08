@@ -2,7 +2,7 @@ import { Repository } from 'typeorm';
 import { CreateModeloDto } from '../dto/create-modelo.dto.js';
 import { UpdateModeloDto } from '../dto/update-modelo.dto.js';
 import { type NegocioConfig } from '../config/negocio.config.js';
-import { Dulce, ProductoModelo } from '../entities/index.js';
+import { Dulce, Encargo, ProductoModelo } from '../entities/index.js';
 import { ImagenService, type MulterFile } from './imagen.service.js';
 import { StorageQuotaService } from './storage-quota.service.js';
 import type { AuthUser } from '../../auth/auth.interfaces.js';
@@ -10,9 +10,11 @@ export declare class ModelosService {
     private readonly config;
     private readonly modeloRepo;
     private readonly dulceRepo;
+    private readonly encargoRepo;
     private readonly imagenes;
     private readonly cuota;
-    constructor(config: NegocioConfig, modeloRepo: Repository<ProductoModelo>, dulceRepo: Repository<Dulce>, imagenes: ImagenService, cuota: StorageQuotaService);
+    private readonly logger;
+    constructor(config: NegocioConfig, modeloRepo: Repository<ProductoModelo>, dulceRepo: Repository<Dulce>, encargoRepo: Repository<Encargo>, imagenes: ImagenService, cuota: StorageQuotaService);
     porPublicacion(productoId: number): Promise<ProductoModelo[]>;
     porPublicaciones(productoIds: number[]): Promise<Map<number, ProductoModelo[]>>;
     crear(productoId: number, dto: CreateModeloDto): Promise<{
@@ -26,6 +28,7 @@ export declare class ModelosService {
     eliminar(id: number, caller: AuthUser): Promise<{
         mensaje: string;
     }>;
+    private pedidosQueLoPiden;
     subirImagen(id: number, file: MulterFile, caller: AuthUser): Promise<{
         mensaje: string;
         modelo: ProductoModelo;

@@ -34,6 +34,19 @@ export class CreateEncargoDto {
   @Min(1)
   @Max(999)
   cantidad: number;
+
+  /**
+   * Qué **modelo** de la publicación se lleva (`producto_modelo.id`). Opcional:
+   * sin él se pide la publicación a secas, con el precio de siempre.
+   *
+   * Solo el id, por la misma razón que `dulce`: el nombre y el precio los lee el
+   * servidor de la tabla. Si el cliente pudiera mandarlos, se cobraría un 420 L
+   * al precio de la más barata.
+   */
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  modelo?: number;
 }
 
 //Un pedido no es mas que la suma de varios encargos
