@@ -38,9 +38,14 @@ DATABASE_URL=postgres://postgres:CLAVE@HOST:5432/BASE
 
 # Nhost → Storage: la base de la API, terminada en /v1.
 # Ejemplo: https://abcdefgh.storage.sa-east-1.nhost.run/v1
+# Si no la encuentras, basta con el subdominio y la región del proyecto
+# (los dos primeros trozos de la URL del dashboard) y el servidor la arma solo:
 NHOST_STORAGE_URL=
+# NHOST_SUBDOMAIN=abcdefgh
+# NHOST_REGION=sa-east-1
 
-# Nhost → Settings → Secrets (Hasura admin secret).
+# Nhost → Settings → Secrets: HASURA_GRAPHQL_ADMIN_SECRET. Se puede guardar
+# con cualquiera de los dos nombres.
 NHOST_ADMIN_SECRET=
 
 # Opcional: un solo bucket para todo. Si lo dejas vacío, crea los buckets

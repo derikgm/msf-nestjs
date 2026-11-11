@@ -86,7 +86,8 @@ rellenar. El `.env` real está en `.gitignore` y no se sube nunca.
 | `SUPABASE_SERVICE_ROLE_KEY` | Acceso a Storage. **Nunca** al frontend |
 | `STORAGE_PROVIDER` | `supabase` (por defecto) o `nhost`. Ver `NHOST.md` |
 | `NHOST_STORAGE_URL` | Base de la API de Storage de Nhost, terminada en `/v1` |
-| `NHOST_ADMIN_SECRET` | Secreto de administración del proyecto Nhost (solo backend) |
+| `NHOST_SUBDOMAIN` / `NHOST_REGION` | Alternativa a la anterior: el servidor arma la URL de Storage |
+| `NHOST_ADMIN_SECRET` | Secreto de administración del proyecto Nhost (solo backend). También se acepta `HASURA_GRAPHQL_ADMIN_SECRET` |
 | `NHOST_BUCKET` | Opcional: un único bucket para todos los roles |
 | `NHOST_PUBLIC_URL_BASE` | Opcional: base pública/CDN para las URLs de las fotos |
 

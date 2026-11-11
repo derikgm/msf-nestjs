@@ -68,19 +68,26 @@ let NhostStorageService = NhostStorageService_1 = class NhostStorageService {
     }
     get baseApi() {
         const url = this.config.get('NHOST_STORAGE_URL')?.trim();
-        if (!url) {
-            throw new ServiceUnavailableException('Falta NHOST_STORAGE_URL en el .env (la base de Storage, terminada en /v1)');
+        if (url)
+            return url.replace(/\/+$/, '');
+        const subdominio = this.config.get('NHOST_SUBDOMAIN')?.trim();
+        const region = this.config.get('NHOST_REGION')?.trim();
+        if (subdominio && region) {
+            return `https://${subdominio}.storage.${region}.nhost.run/v1`;
         }
-        return url.replace(/\/+$/, '');
+        throw new ServiceUnavailableException('Falta NHOST_STORAGE_URL en el .env (la base de Storage, terminada en /v1) ' +
+            'o, en su lugar, NHOST_SUBDOMAIN y NHOST_REGION');
     }
     get basePublica() {
         const propia = this.config.get('NHOST_PUBLIC_URL_BASE')?.trim();
         return (propia || `${this.baseApi}/files`).replace(/\/+$/, '');
     }
     get adminSecret() {
-        const secreto = this.config.get('NHOST_ADMIN_SECRET')?.trim();
+        const secreto = (this.config.get('NHOST_ADMIN_SECRET') ??
+            this.config.get('HASURA_GRAPHQL_ADMIN_SECRET'))?.trim();
         if (!secreto) {
-            throw new ServiceUnavailableException('Falta NHOST_ADMIN_SECRET en el .env (secreto de administración de Nhost)');
+            throw new ServiceUnavailableException('Falta NHOST_ADMIN_SECRET en el .env (secreto de administración de Nhost, ' +
+                'el HASURA_GRAPHQL_ADMIN_SECRET de Settings → Secrets)');
         }
         return secreto;
     }

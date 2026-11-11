@@ -130,14 +130,21 @@ async function probarBaseDeDatos() {
 async function probarStorage() {
   console.log('\n2) Storage');
 
-  const base = recortar(entorno.NHOST_STORAGE_URL).replace(/\/+$/, '');
-  const secreto = recortar(entorno.NHOST_ADMIN_SECRET);
+  const base = (
+    recortar(entorno.NHOST_STORAGE_URL) ||
+    (recortar(entorno.NHOST_SUBDOMAIN) && recortar(entorno.NHOST_REGION)
+      ? `https://${recortar(entorno.NHOST_SUBDOMAIN)}.storage.${recortar(entorno.NHOST_REGION)}.nhost.run/v1`
+      : '')
+  ).replace(/\/+$/, '');
+  const secreto = recortar(
+    entorno.NHOST_ADMIN_SECRET || entorno.HASURA_GRAPHQL_ADMIN_SECRET,
+  );
   const bucket = recortar(entorno.NHOST_BUCKET) || 'default';
 
   if (!base) {
     fallo(
       'Falta NHOST_STORAGE_URL',
-      'Es la base de Storage terminada en /v1, p. ej. https://xxxx.storage.sa-east-1.nhost.run/v1',
+      'Es la base de Storage terminada en /v1. También puedes definir NHOST_SUBDOMAIN y NHOST_REGION.',
     );
     return;
   }
@@ -145,7 +152,7 @@ async function probarStorage() {
   if (!secreto) {
     fallo(
       'Falta NHOST_ADMIN_SECRET',
-      'Está en Nhost → Settings → Secrets / Hasura admin secret.',
+      'Está en Nhost → Settings → Secrets: HASURA_GRAPHQL_ADMIN_SECRET.',
     );
     return;
   }
