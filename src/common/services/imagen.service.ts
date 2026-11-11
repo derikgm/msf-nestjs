@@ -1,13 +1,17 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
 import { ObjectLiteral, Repository } from 'typeorm';
-import { SupabaseService } from './supabase.service.js';
+import { STORAGE_SERVICE, type StorageService } from './storage.service.js';
 import { StorageQuotaService } from './storage-quota.service.js';
 
 export type MulterFile = Express.Multer.File;
 
-/** Un bucket por proyecto. El que falte lo crea el servidor al subir (ver `SupabaseService`). */
+/**
+ * Un bucket por proyecto. En Supabase el que falte lo crea el servidor al
+ * subir; en Nhost tienen que existir antes o usar `NHOST_BUCKET`. Ver
+ * `StorageService`.
+ */
 export const BUCKET_POR_ROL: Record<string, string> = {
   delys: 'delys',
   domus: 'domus',
@@ -25,9 +29,10 @@ export interface ConImagen {
 }
 
 /**
- * Subida y borrado de imágenes contra Supabase Storage, **una sola vez** para
- * todas las entidades que tienen foto (el catálogo y, desde el punto 3, las
- * instalaciones de ADC y los combos de Delys).
+ * Subida y borrado de imágenes contra el almacenamiento configurado
+ * (`STORAGE_PROVIDER`: Supabase o Nhost), **una sola vez** para todas las
+ * entidades que tienen foto (el catálogo y, desde el punto 3, las instalaciones
+ * de ADC y los combos de Delys).
  *
  * Antes esta lógica vivía dentro de `DulceImagenService`; al aparecer dos
  * entidades más con imagen habría quedado copiada tres veces. Aquí queda el
@@ -44,7 +49,8 @@ export class ImagenService {
   private readonly logger = new Logger(ImagenService.name);
 
   constructor(
-    private readonly supabase: SupabaseService,
+    @Inject(STORAGE_SERVICE)
+    private readonly storage: StorageService,
     private readonly cuota: StorageQuotaService,
   ) {}
 
@@ -81,7 +87,7 @@ export class ImagenService {
     const path = `${carpeta}/${randomUUID()}${this.extensionDe(file)}`;
 
     try {
-      await this.supabase.subir(bucket, path, file.buffer, file.mimetype);
+      await this.storage.subir(bucket, path, file.buffer, file.mimetype);
     } catch (error) {
       await this.cuota.decrementarUso(rol, bytes);
       throw error;
@@ -90,7 +96,7 @@ export class ImagenService {
     const urlAnterior = entidad.imagen_url;
     const bytesAnteriores = entidad.imagen_bytes;
 
-    entidad.imagen_url = this.supabase.getPublicUrl(bucket, path);
+    entidad.imagen_url = this.storage.getPublicUrl(bucket, path);
     entidad.imagen_bytes = bytes;
 
     const actualizado = await repo.save(entidad);
@@ -159,19 +165,19 @@ export class ImagenService {
     if (!imagenUrl) return;
 
     const bucket = this.bucketDe(rol);
-    const path = this.supabase.pathDesdeUrl(bucket, imagenUrl);
+    const path = this.storage.pathDesdeUrl(bucket, imagenUrl);
 
     if (!path) return;
 
     try {
-      await this.supabase.eliminar(bucket, [path]);
+      await this.storage.eliminar(bucket, [path]);
     } catch (error) {
       this.logger.warn(
         `No se pudo borrar la imagen de ${etiqueta} (${path}): ${(error as Error).message}. Reintentando...`,
       );
 
       try {
-        await this.supabase.eliminar(bucket, [path]);
+        await this.storage.eliminar(bucket, [path]);
       } catch (segundoError) {
         this.logger.error(
           `La imagen de ${etiqueta} (${path}) sigue sin borrarse tras el reintento: ` +

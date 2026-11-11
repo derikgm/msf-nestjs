@@ -7,11 +7,14 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var ImagenService_1;
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { extname } from 'path';
-import { SupabaseService } from './supabase.service.js';
+import { STORAGE_SERVICE } from './storage.service.js';
 import { StorageQuotaService } from './storage-quota.service.js';
 export const BUCKET_POR_ROL = {
     delys: 'delys',
@@ -19,11 +22,11 @@ export const BUCKET_POR_ROL = {
     adc: 'adc',
 };
 let ImagenService = ImagenService_1 = class ImagenService {
-    supabase;
+    storage;
     cuota;
     logger = new Logger(ImagenService_1.name);
-    constructor(supabase, cuota) {
-        this.supabase = supabase;
+    constructor(storage, cuota) {
+        this.storage = storage;
         this.cuota = cuota;
     }
     async subir(repo, entidad, file, rol, carpeta, etiqueta) {
@@ -38,7 +41,7 @@ let ImagenService = ImagenService_1 = class ImagenService {
         }
         const path = `${carpeta}/${randomUUID()}${this.extensionDe(file)}`;
         try {
-            await this.supabase.subir(bucket, path, file.buffer, file.mimetype);
+            await this.storage.subir(bucket, path, file.buffer, file.mimetype);
         }
         catch (error) {
             await this.cuota.decrementarUso(rol, bytes);
@@ -46,7 +49,7 @@ let ImagenService = ImagenService_1 = class ImagenService {
         }
         const urlAnterior = entidad.imagen_url;
         const bytesAnteriores = entidad.imagen_bytes;
-        entidad.imagen_url = this.supabase.getPublicUrl(bucket, path);
+        entidad.imagen_url = this.storage.getPublicUrl(bucket, path);
         entidad.imagen_bytes = bytes;
         const actualizado = await repo.save(entidad);
         if (urlAnterior) {
@@ -76,16 +79,16 @@ let ImagenService = ImagenService_1 = class ImagenService {
         if (!imagenUrl)
             return;
         const bucket = this.bucketDe(rol);
-        const path = this.supabase.pathDesdeUrl(bucket, imagenUrl);
+        const path = this.storage.pathDesdeUrl(bucket, imagenUrl);
         if (!path)
             return;
         try {
-            await this.supabase.eliminar(bucket, [path]);
+            await this.storage.eliminar(bucket, [path]);
         }
         catch (error) {
             this.logger.warn(`No se pudo borrar la imagen de ${etiqueta} (${path}): ${error.message}. Reintentando...`);
             try {
-                await this.supabase.eliminar(bucket, [path]);
+                await this.storage.eliminar(bucket, [path]);
             }
             catch (segundoError) {
                 this.logger.error(`La imagen de ${etiqueta} (${path}) sigue sin borrarse tras el reintento: ` +
@@ -106,8 +109,8 @@ let ImagenService = ImagenService_1 = class ImagenService {
 };
 ImagenService = ImagenService_1 = __decorate([
     Injectable(),
-    __metadata("design:paramtypes", [SupabaseService,
-        StorageQuotaService])
+    __param(0, Inject(STORAGE_SERVICE)),
+    __metadata("design:paramtypes", [Object, StorageQuotaService])
 ], ImagenService);
 export { ImagenService };
 //# sourceMappingURL=imagen.service.js.map

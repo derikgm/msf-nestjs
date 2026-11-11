@@ -84,14 +84,21 @@ rellenar. El `.env` real está en `.gitignore` y no se sube nunca.
 | `AUTH_JWT_EXPIRES_IN` | Vigencia del token: `30m`, `8h`, `7d` |
 | `SUPABASE_URL` | Proyecto de Supabase (Storage) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Acceso a Storage. **Nunca** al frontend |
+| `STORAGE_PROVIDER` | `supabase` (por defecto) o `nhost`. Ver `NHOST.md` |
+| `NHOST_STORAGE_URL` | Base de la API de Storage de Nhost, terminada en `/v1` |
+| `NHOST_ADMIN_SECRET` | Secreto de administración del proyecto Nhost (solo backend) |
+| `NHOST_BUCKET` | Opcional: un único bucket para todos los roles |
+| `NHOST_PUBLIC_URL_BASE` | Opcional: base pública/CDN para las URLs de las fotos |
 
-Si falta `AUTH_JWT_SECRET` la app **no arranca**: es preferible fallar al inicio que devolver 500 en la primera petición. Las variables de Supabase sí son perezosas: si faltan, solo fallan las rutas de imagen (503), el resto sigue sirviendo.
+Si falta `AUTH_JWT_SECRET` la app **no arranca**: es preferible fallar al inicio que devolver 500 en la primera petición. Las variables de Storage (Supabase o Nhost) sí son perezosas: si faltan, solo fallan las rutas de imagen (503), el resto sigue sirviendo.
+
+Para probar Nhost sin tocar producción, esta la guía **`NHOST.md`** y la prueba `node scripts/probar-nhost.mjs` (conecta a la base, sube y borra un PNG de prueba).
 
 En Wasmer **no subas `.env`**: define las variables como variables de entorno del despliegue (la lista completa, sin secretos, está en `.env.example`).
 
 ## Imágenes de los dulces
 
-`POST /delys/dulces/:id/imagen` (multipart/form-data, campo `imagen`) sube el archivo a Supabase Storage y guarda **solo la URL pública** y el tamaño en la BD; el binario nunca pasa por la base de datos ni se queda en disco (multer usa memoria). `DELETE` en la misma ruta borra el archivo y lo baja del catálogo.
+`POST /delys/dulces/:id/imagen` (multipart/form-data, campo `imagen`) sube el archivo al Storage configurado y guarda **solo la URL pública** y el tamaño en la BD; el binario nunca pasa por la base de datos ni se queda en disco (multer usa memoria). `DELETE` en la misma ruta borra el archivo y lo baja del catálogo.
 
 ```bash
 curl -X POST localhost:3000/delys/dulces/1/imagen \
@@ -101,7 +108,7 @@ curl -X POST localhost:3000/delys/dulces/1/imagen \
 curl -X DELETE localhost:3000/delys/dulces/1/imagen -H "Authorization: Bearer eyJ..."
 ```
 
-El bucket es el del rol (`delys`/`domus`/`adc`), o sea un bucket por proyecto. Los tres están declarados en `BUCKET_POR_ROL` (`src/common/services/dulce-imagen.service.ts`) y **los que falten los crea el propio servidor en la primera subida**: si Storage contesta *Bucket not found*, `SupabaseService` crea el bucket (público de lectura, como `delys`) y repite la subida. El de `adc` se creó el 2026-10-07, cuando la subida de una foto devolvía `500` porque no existía.
+El bucket es el del rol (`delys`/`domus`/`adc`), o sea un bucket por proyecto. Los tres están declarados en `BUCKET_POR_ROL` (`src/common/services/dulce-imagen.service.ts`). Con **Supabase**, los que falten los crea el propio servidor en la primera subida: si Storage contesta *Bucket not found*, `SupabaseService` crea el bucket (público de lectura, como `delys`) y repite la subida. Con **Nhost** los buckets se crean en el dashboard o por SQL antes de usarlos (ver `NHOST.md`); `NHOST_BUCKET` permite usar uno solo para los tres roles.
 
 Lo que decide el servidor, no el cliente:
 

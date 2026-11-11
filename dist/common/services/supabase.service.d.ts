@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import type { SupabaseClient } from '@supabase/supabase-js';
-export declare class SupabaseService {
+import type { StorageService } from './storage.service.js';
+export declare class SupabaseService implements StorageService {
     private readonly config;
     private readonly logger;
     private cliente;

@@ -8,10 +8,10 @@ import { CombosService } from '../common/services/combos.service.js';
 import { entities } from '../common/entities/index.js';
 import { CONFIG_DELYS, NEGOCIO } from '../common/config/negocio.config.js';
 import { StorageQuotaModule } from '../common/modules/storage-quota/storage-quota.module.js';
-import { SupabaseModule } from '../common/modules/supabase/supabase.module.js';
+import { StorageModule } from '../common/modules/storage/storage.module.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature(entities), StorageQuotaModule, SupabaseModule],
+  imports: [TypeOrmModule.forFeature(entities), StorageQuotaModule, StorageModule],
   controllers: [DelysController],
   providers: [
     { provide: NEGOCIO, useValue: CONFIG_DELYS },

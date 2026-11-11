@@ -14,14 +14,14 @@ import { InstalacionesService } from '../common/services/instalaciones.service.j
 import { ModelosService } from '../common/services/modelos.service.js';
 import { entities } from '../common/entities/index.js';
 import { StorageQuotaModule } from '../common/modules/storage-quota/storage-quota.module.js';
-import { SupabaseModule } from '../common/modules/supabase/supabase.module.js';
+import { StorageModule } from '../common/modules/storage/storage.module.js';
 import { AdcController } from './adc.controller.js';
 import { CONFIG_ADC } from './adc.config.js';
 let AdcModule = class AdcModule {
 };
 AdcModule = __decorate([
     Module({
-        imports: [TypeOrmModule.forFeature(entities), StorageQuotaModule, SupabaseModule],
+        imports: [TypeOrmModule.forFeature(entities), StorageQuotaModule, StorageModule],
         controllers: [AdcController],
         providers: [
             { provide: NEGOCIO, useValue: CONFIG_ADC },
