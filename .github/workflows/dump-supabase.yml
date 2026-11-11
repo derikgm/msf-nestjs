@@ -1,0 +1,31 @@
+name: Dump de Supabase
+
+# Fuerza una copia de seguridad de la base de datos de Supabase para la
+# recuperación que se está haciendo mientras Nhost se prueba (rama feature/nhost).
+#
+# Requiere: en Settings → Secrets and variables → Actions:
+#   SUPABASE_DATABASE_URL = postgres://postgres:<clave>@<host>:5432/<base>
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar cliente de PostgreSQL
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: pg_dump de la base de Supabase
+        run: |
+          pg_dump --no-owner --no-privileges "$SUPABASE_DATABASE_URL" > supabase-dump.sql
+
+      - name: Guardar dump como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-dump
+          path: supabase-dump.sql
+          retention-days: 14
