@@ -34,6 +34,9 @@ import type { StorageService } from './storage.service.js';
 export class NhostStorageService implements StorageService {
   private readonly logger = new Logger(NhostStorageService.name);
 
+  /** Subidas hechas en esta instancia: `bucket/path` → id que Nhost asignó. */
+  private readonly subidas = new Map<string, string>();
+
   constructor(private readonly config: ConfigService) {}
 
   async subir(
@@ -75,6 +78,8 @@ export class NhostStorageService implements StorageService {
       throw this.fallo('subir la imagen', motivo);
     }
 
+    this.subidas.set(`${bucket}/${path}`, id);
+
     this.logger.log(`Imagen subida a Nhost (bucket «${destino}», id ${id})`);
 
     return id;
@@ -103,8 +108,15 @@ export class NhostStorageService implements StorageService {
     }
   }
 
-  getPublicUrl(_bucket: string, path: string): string {
-    return `${this.basePublica}/${encodeURIComponent(path)}`;
+  getPublicUrl(bucket: string, path: string): string {
+    const id = this.subidas.get(`${bucket}/${path}`);
+
+    // En Nhost el id se asigna al subir (no se elige el nombre) y la URL pública
+    // es `<base>/files/<id>`. Una ruta con carpeta (`dulces/uuid.png`) se rechaza
+    // con 404: por eso la reconstruimos desde el id guardado.
+    const identificador = id ?? path;
+
+    return `${this.basePublica}/${encodeURIComponent(identificador)}`;
   }
 
   pathDesdeUrl(_bucket: string, url: string): string | undefined {

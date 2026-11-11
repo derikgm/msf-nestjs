@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 let NhostStorageService = NhostStorageService_1 = class NhostStorageService {
     config;
     logger = new Logger(NhostStorageService_1.name);
+    subidas = new Map();
     constructor(config) {
         this.config = config;
     }
@@ -35,6 +36,7 @@ let NhostStorageService = NhostStorageService_1 = class NhostStorageService {
                 'la respuesta de Nhost no trajo processedFiles[0].id';
             throw this.fallo('subir la imagen', motivo);
         }
+        this.subidas.set(`${bucket}/${path}`, id);
         this.logger.log(`Imagen subida a Nhost (bucket «${destino}», id ${id})`);
         return id;
     }
@@ -54,8 +56,10 @@ let NhostStorageService = NhostStorageService_1 = class NhostStorageService {
             throw this.fallo('borrar la imagen', motivo);
         }
     }
-    getPublicUrl(_bucket, path) {
-        return `${this.basePublica}/${encodeURIComponent(path)}`;
+    getPublicUrl(bucket, path) {
+        const id = this.subidas.get(`${bucket}/${path}`);
+        const identificador = id ?? path;
+        return `${this.basePublica}/${encodeURIComponent(identificador)}`;
     }
     pathDesdeUrl(_bucket, url) {
         const marca = `${this.basePublica}/`;
