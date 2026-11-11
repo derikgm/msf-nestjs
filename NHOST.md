@@ -58,11 +58,17 @@ Y en el dashboard de Nhost:
 1. **Database → Settings → Access**: activar *Public access*. Sin eso, Wasmer
    (o cualquier servidor fuera de Nhost Run) no puede conectarse.
 2. **Storage**: crear el bucket (`default` o los tres por rol).
-3. **Storage → Permissions**: dar al rol `public` permiso `select` sobre
-   `storage.files`. Las vitrinas muestran las fotos con un `<img src>` normal,
-   sin token; si ese permiso falta, la subida funciona pero la imagen da 401.
+3. **Storage → Permissions** (abajo del menú lateral): dar al rol `public` el
+   permiso **Download**, con una regla `bucket_id` = `default` (o *Without any
+   checks* si se quiere abrir todo). Las vitrinas muestran las fotos con un
+   `<img src>` normal, sin token; si ese permiso falta, la subida funciona pero
+   la imagen da **403**.
 4. **Storage → Buckets → Edit**: permitir los MIME de imagen y un tamaño
    máximo razonable (nuestro límite de cuota es aparte).
+
+> En el proyecto de prueba esto ya está aplicado: rol `public`, acción
+> Download, sobre el bucket `default`. Si más adelante se usan buckets por rol
+> (`delys`, `adc`, `domus`) hay que ampliar la regla para cubrirlos.
 
 Después, desde `msf-nestjs/`:
 
