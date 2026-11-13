@@ -14,4 +14,4 @@ export { Instalacion } from './instalacion.entity.js';
 export { Pedido } from './pedido.entity.js';
 export { ProductoModelo } from './producto-modelo.entity.js';
 export { Seccion } from './seccion.entity.js';
-export declare const entities: (typeof Encargo | typeof Dulce | typeof ProductoModelo | typeof Pedido | typeof Seccion | typeof Instalacion | typeof Combo | typeof ComboDulce)[];
+export declare const entities: (typeof ComboDulce | typeof Combo | typeof Seccion | typeof Dulce | typeof ProductoModelo | typeof Pedido | typeof Encargo | typeof Instalacion)[];
