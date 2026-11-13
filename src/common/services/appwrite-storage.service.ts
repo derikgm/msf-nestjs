@@ -156,8 +156,8 @@ export class AppwriteStorageService implements StorageService {
 
     const [, bucketId, id] = coincidencia;
 
-    if (bucket && bucketId !== bucket) return undefined;
-
+    // Igual que en Nhost: el id es lo que se usa para borrar; el bucket lo
+    // resuelve el llamador (con `APPWRITE_BUCKET` o el del rol).
     return id ? decodeURIComponent(id) : undefined;
   }
 

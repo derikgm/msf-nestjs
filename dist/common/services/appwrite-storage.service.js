@@ -74,8 +74,6 @@ let AppwriteStorageService = AppwriteStorageService_1 = class AppwriteStorageSer
         if (!coincidencia)
             return undefined;
         const [, bucketId, id] = coincidencia;
-        if (bucket && bucketId !== bucket)
-            return undefined;
         return id ? decodeURIComponent(id) : undefined;
     }
     get baseApi() {
