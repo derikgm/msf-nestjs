@@ -89,6 +89,20 @@ Si falta `AUTH_JWT_SECRET` la app **no arranca**: es preferible fallar al inicio
 
 En Wasmer **no subas `.env`**: define las variables como variables de entorno del despliegue (la lista completa, sin secretos, está en `.env.example`).
 
+### Proveedores de Storage
+
+`STORAGE_PROVIDER` elige el backend de imágenes (`supabase` por defecto, `nhost`
+o `appwrite`). La abstracción está en `src/common/services/storage.service.ts`
+y `ImagenService` no cambia: solo cambia el adapter que recibe
+`STORAGE_SERVICE`.
+
+* **Supabase** (`STORAGE_PROVIDER=supabase`): crea los buckets que falten.
+* **Nhost** (`STORAGE_PROVIDER=nhost`): `NHOST_STORAGE_URL`, `NHOST_ADMIN_SECRET`,
+  `NHOST_BUCKET`, `NHOST_PUBLIC_URL_BASE`. Ver `NHOST.md`.
+* **Appwrite** (`STORAGE_PROVIDER=appwrite`): `APPWRITE_ENDPOINT`,
+  `APPWRITE_PROJECT_ID`, `APPWRITE_API_KEY`, `APPWRITE_BUCKET`,
+  `APPWRITE_PUBLIC_URL_BASE`. Ver `APPWRITE.md`.
+
 ## Imágenes de los dulces
 
 `POST /delys/dulces/:id/imagen` (multipart/form-data, campo `imagen`) sube el archivo a Supabase Storage y guarda **solo la URL pública** y el tamaño en la BD; el binario nunca pasa por la base de datos ni se queda en disco (multer usa memoria). `DELETE` en la misma ruta borra el archivo y lo baja del catálogo.

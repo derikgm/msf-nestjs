@@ -2,9 +2,10 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import { ConfigService } from '@nestjs/config';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { crearSupabaseClient } from '../providers/supabase.provider.js';
+import type { StorageService } from './storage.service.js';
 
 @Injectable()
-export class SupabaseService {
+export class SupabaseService implements StorageService {
   private readonly logger = new Logger(SupabaseService.name);
   private cliente: SupabaseClient | undefined;
 

@@ -31,6 +31,8 @@ export interface Dulce {
     precio: number,
     /** URL pública del archivo en Supabase Storage; null si el dulce no tiene imagen. */
     imagen_url: string | null,
+    /** Descripción larga del producto; null si no tiene. */
+    descripcion: string | null,
     /**
      * Moneda del `precio` (`'CUP'`, `'USD'`…). Texto libre de hasta 8 letras:
      * no es un enum, para que puedan entrar monedas nuevas sin migraciones.
@@ -45,6 +47,59 @@ export interface Dulce {
 export interface Encargo {
     dulce: Dulce,
     cantidad: number,
+    /**
+     * Qué modelo de la publicación se llevaron (`producto_modelo.id`). Null
+     * cuando se pidió una publicación sin modelos **y** en los renglones creados
+     * antes de que existiera la columna: el histórico no puede distinguirlos,
+     * así que lo que resuelve es `nombre_vendido`.
+     */
+    modelo_id: number | null,
+    /**
+     * Cómo se escribió el renglón aquel día: `Nevera No Frost 250 L — 240 L
+     * inverter`. Se guarda porque el catálogo se puede renombrar, y un pedido de
+     * hace seis meses no debe cambiar de significado al hacerlo.
+     */
+    nombre_vendido: string | null,
+    /**
+     * Precio **unitario** de aquel día, con la moneda del catálogo. Lo que se
+     * cobró sigue estando en `pedido.precio_total`; esto es lo que sobra para
+     * poder rehacer la cuenta.
+     */
+    precio_vendido: number | null,
+}
+
+/**
+ * Un **modelo** dentro de una publicación (lo que Amazon llama variación de
+ * talla/color): la invernadero que se vende como «Nevera inverter» puede tener
+ * `240 L`, `340 L` y `420 L`, cada una con su precio, su foto y sus
+ * características.
+ *
+ * `producto` es la publicación y `producto_modelo` los modelos que se eligen
+ * en la web. Un producto sin modelos se sigue vendiendo igual que hoy: los
+ * modelos son opcionales.
+ *
+ * No lleva `negocio`: pertenece a un `producto`, y ese ya es de uno solo.
+ * Filtrar por negocio es responsabilidad de quien consulta, uniendo con la
+ * publicación (así no puede existir un modelo de ADC colgado de un dulce).
+ */
+export interface ProductoModelo {
+    id: number,
+    /** Publicación a la que pertenece: referencia a `producto.id`. */
+    producto_id: number,
+    /** Nombre corto del modelo: `240 L inverter`, `12 V / 100 Ah`… */
+    nombre: string,
+    precio: number,
+    /** Mismo criterio que `producto.moneda`: texto libre de hasta 8 letras. */
+    moneda: string,
+    /** Foto del modelo; null si el modelo no tiene foto (se usa la de la publicación). */
+    imagen_url: string | null,
+    /**
+     * Características escritas por el dueño, en pares `etiqueta: valor`
+     * (`{ "Peso": "38 kg", "Potencia": "120 W" }`). `jsonb` y no una tabla
+     * aparte: el orden de las claves lo fija Postgres, se busca sin JOIN y
+     * mañana puede entrar una característica nueva sin tocar el esquema.
+     */
+    atributos: Record<string, string>,
 }
 
 /**
@@ -75,6 +130,8 @@ export interface DulcePublico {
     precio: number,
     /** URL pública del archivo en Supabase Storage; null si no tiene imagen. */
     imagen_url: string | null,
+    /** Descripción larga del producto; null si no tiene. */
+    descripcion: string | null,
     /** Moneda del `precio` (`'CUP'`, `'USD'`…). Texto libre de hasta 8 letras. */
     moneda: string,
     /** A qué sección del catálogo pertenece: referencia a `seccion.id`. */

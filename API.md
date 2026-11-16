@@ -25,6 +25,12 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `POST` | `/adc/secciones` | `adc` o `admin`, **alta de sección** |
 | `PATCH` | `/adc/secciones/:id` | `adc` o `admin`, **renombra una sección** |
 | `DELETE` | `/adc/secciones/:id` | `adc` o `admin`, **borra una sección vacía** |
+| `GET` | `/adc/instalaciones` | público, **servicios de instalación de ADC** |
+| `POST` | `/adc/instalaciones` | `adc` o `admin`, **alta de instalación** |
+| `PATCH` | `/adc/instalaciones/:id` | `adc` o `admin`, **edita nombre, precio, moneda o descripción** |
+| `DELETE` | `/adc/instalaciones/:id` | `adc` o `admin`, **borra la instalación** |
+| `POST` | `/adc/instalaciones/:id/imagen` | `adc` o `admin`, sube la foto; la respuesta trae la clave **`instalacion`** |
+| `DELETE` | `/adc/instalaciones/:id/imagen` | `adc` o `admin`, quita la foto; igual, clave **`instalacion`** |
 | `POST` | `/auth/login` | público |
 | `POST` | `/auth/registro` | público, **solo** mientras el rol no tenga usuarios |
 | `POST` | `/auth/usuarios` | cualquier rol, crea usuarios **de ese mismo rol** |
@@ -48,6 +54,12 @@ Dos guards globales (`src/auth/auth.module.ts`): primero `JwtAuthGuard` (firma d
 | `DELETE` | `/adc/pedidos/:id` | `adc` o `admin` |
 | `POST` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
 | `DELETE` | `/delys/dulces/:id/imagen` | `delys` o `admin` |
+| `GET` | `/delys/combos` | público, **combos de dulces de Delys** |
+| `POST` | `/delys/combos` | `delys` o `admin`, **alta de combo** |
+| `PATCH` | `/delys/combos/:id` | `delys` o `admin`, **edita nombre, precio, moneda o dulces** |
+| `DELETE` | `/delys/combos/:id` | `delys` o `admin`, **borra el combo** |
+| `POST` | `/delys/combos/:id/imagen` | `delys` o `admin`, sube la foto; la respuesta trae la clave **`combo`** |
+| `DELETE` | `/delys/combos/:id/imagen` | `delys` o `admin`, quita la foto; igual, clave **`combo`** |
 
 `admin` es el único rol con paso libre: `RolesGuard` lo deja entrar a cualquier ruta con `@Roles()`, sin importar el rol que pida. El resto de roles solo ven lo de su propio proyecto (ver [Decisiones.md](Decisiones.md), punto 1.3).
 
@@ -65,7 +77,7 @@ rota). Para los clientes que aún leían el antiguo `message` de Nest, el campo
 
 Códigos usados: `400` datos inválidos o cuota insuficiente, `401` sin token / token caducado / contraseña incorrecta / usuario desactivado, `403` rol que no es el del proyecto, `404` recurso inexistente, `409` `usuario` repetido, `429` demasiadas peticiones (más abajo), `503` falta la configuración de Supabase **o** la base de datos no respondió.
 
-Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"mensaje": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos. **Los GET públicos de catálogo están exentos** (`@SkipThrottle()`): `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /adc/productos` y `GET /adc/secciones` no devuelven nunca `429`.
+Hay **límite de peticiones** (`@nestjs/throttler`): `300` por minuto e IP en cualquier ruta, y `10` por minuto e IP en `POST /auth/login`, `POST /auth/registro`, `POST /delys/pedido` y `POST /adc/pedido`. Al pasarlo responde `429` con `"mensaje": "ThrottlerException: Too Many Requests"` y la ventana vuelve a estar libre a los 60 segundos. **Los GET públicos de catálogo están exentos** (`@SkipThrottle()`): `GET /delys/dulces`, `GET /delys/ofertas`, `GET /delys/secciones`, `GET /delys/combos`, `GET /adc/productos`, `GET /adc/secciones` y `GET /adc/instalaciones` no devuelven nunca `429`.
 
 Los cuatro fallos del guard tienen mensajes distintos, para que el cliente sepa si tiene que iniciar sesión otra vez o solo reintentar:
 
@@ -677,25 +689,34 @@ El catálogo se navega por secciones (tabla `seccion`), y cada producto pertenec
 
 Los nombres se guardan en minúsculas (`Electronico` pasa a `electronico`) y deben ser únicos dentro de cada negocio.
 
+**Subcategorías**: una sección puede colgar de otra con `padre_id`. `null` es una categoría principal y un id es la categoría de la que cuelga. El árbol es de **un solo nivel** (el padre tiene que ser principal). Delys no las usa: su endpoint de alta las ignora y crea siempre secciones principales.
+
 #### 20.1. `GET /delys/secciones` y `GET /adc/secciones`
 
-Públicas. Devuelven las secciones del negocio, en orden de creación:
+Públicas. Devuelven las secciones del negocio, en orden de creación. Cada una trae `padre_id` (subcategorías):
 
 ```bash
 curl localhost:3000/delys/secciones
-# -> { "secciones": [ { "id": 2, "nombre": "dulces" } ] }
+# -> { "secciones": [ { "id": 2, "nombre": "dulces", "padre_id": null } ] }
 curl localhost:3000/adc/secciones
-# -> { "secciones": [ { "id": 4, "nombre": "electronico" } ] }
+# -> { "secciones": [
+#        { "id": 4, "nombre": "electrodomesticos", "padre_id": null },
+#        { "id": 8, "nombre": "neveras", "padre_id": 4 }
+#      ] }
 ```
 
 #### 20.2. `POST /delys/secciones` y `POST /adc/secciones`
 
-Alta desde el panel, con token del negocio (o `admin`, que entra a todo):
+Alta desde el panel, con token del negocio (o `admin`, que entra a todo). `padre_id` es opcional: con él se crea una **subcategoría**, sin él una categoría principal:
 
 ```bash
 curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" -d '{"nombre":"Electronico"}'
-# -> { "mensaje": "Sección creada correctamente", "seccion": { "id": 5, "nombre": "electronico", ... } }
+# -> { "mensaje": "Sección creada correctamente", "seccion": { "id": 5, "nombre": "electronico", "padre_id": null, ... } }
+
+curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" -d '{"nombre":"Neveras","padre_id":5}'
+# -> { "mensaje": "Sección creada correctamente", "seccion": { "id": 9, "nombre": "neveras", "padre_id": 5, ... } }
 ```
 
 | Situación | Respuesta |
@@ -703,7 +724,11 @@ curl -X POST localhost:3000/adc/secciones -H "Authorization: Bearer eyJ..." \
 | `nombre` vacío o de más de 60 letras | `400` |
 | nombre `dulces` (reservado) | `400`: `"dulces" es la sección reservada del catálogo heredado: elige otro nombre` |
 | sección repetida en el mismo negocio | `409`: `La sección "electronico" ya existe` |
+| `padre_id` de otro negocio (o inexistente) | `404`: `No existe la sección 4` |
+| `padre_id` de una subcategoría (segundo nivel) | `400`: `La sección "neveras" ya es una subcategoría: no puede tener subcategorías dentro` |
 | sin token / rol equivocado | `401` / `403` |
+
+`POST /delys/secciones` acepta el mismo DTO pero **ignora `padre_id`**: la pastelería no usa subcategorías.
 
 #### 20.3. Sección de un producto (`seccion_id`)
 
@@ -724,7 +749,8 @@ curl localhost:3000/adc/productos
 # -> {
 #      "productos": [ { "id": 7, "nombre": "Inversor 1500W", "precio": 18500, "moneda": "CUP",
 #                       "imagen_url": null, "seccion_id": 4, "seccion": "electronico" } ],
-#      "secciones": [ { "id": 4, "nombre": "electronico" } ]
+#      "secciones": [ { "id": 4, "nombre": "electrodomesticos", "padre_id": null },
+#                     { "id": 8, "nombre": "neveras", "padre_id": 4 } ]
 #    }
 ```
 
@@ -732,12 +758,16 @@ curl localhost:3000/adc/productos
 
 #### 20.5. `PATCH /adc/secciones/:id`
 
-Renombra una sección (solo ADC, con token `adc` o `admin`). El cuerpo es el mismo que en el alta: `{"nombre": "nuevo nombre"}`.
+Renombra una sección y/o la mueve de categoría (solo ADC, con token `adc` o `admin`). El cuerpo acepta `nombre` y/o `padre_id`; los dos son opcionales, pero uno tiene que venir. `padre_id: null` la convierte en categoría principal:
 
 ```bash
 curl -X PATCH localhost:3000/adc/secciones/4 -H "Authorization: Bearer eyJ..." \
   -H "Content-Type: application/json" -d '{"nombre":"Paneles solares"}'
-# -> { "mensaje": "Sección actualizada correctamente", "seccion": { "id": 4, "nombre": "paneles solares", ... } }
+# -> { "mensaje": "Sección actualizada correctamente", "seccion": { "id": 4, "nombre": "paneles solares", "padre_id": null, ... } }
+
+curl -X PATCH localhost:3000/adc/secciones/8 -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" -d '{"padre_id": 4}'
+# -> { "mensaje": "Sección actualizada correctamente", "seccion": { "id": 8, "nombre": "neveras", "padre_id": 4, ... } }
 ```
 
 | Situación | Respuesta |
@@ -745,9 +775,13 @@ curl -X PATCH localhost:3000/adc/secciones/4 -H "Authorization: Bearer eyJ..." \
 | la sección no existe o es de otro negocio | `404`: `No existe la sección 4` |
 | nombre vacío o `dulces` (reservado) | `400` |
 | ya hay otra sección con ese nombre | `409`: `La sección "paneles solares" ya existe` |
+| `padre_id` de otro negocio (o inexistente) | `404`: `No existe la sección 4` |
+| `padre_id` de una subcategoría (segundo nivel) | `400` |
+| la sección tiene subcategorías y se intenta colgar de otra | `400`: `... tiene N subcategorías: no puede pasar a ser subcategoría` |
+| no llega ni `nombre` ni `padre_id` | `400`: `No hay nada que actualizar...` |
 | sin token / rol equivocado | `401` / `403` |
 
-El cambio se ve en la tienda en la siguiente lectura: `GET /adc/productos` agrupa por el nombre nuevo y los productos se quedan donde estaban (se mueven desde el panel con `PATCH /adc/productos/:id` y su `seccion_id`).
+El cambio se ve en la tienda en la siguiente lectura: `GET /adc/productos` devuelve el `padre_id` nuevo y los productos se quedan donde estaban (se mueven desde el panel con `PATCH /adc/productos/:id` y su `seccion_id`).
 
 #### 20.6. `DELETE /adc/secciones/:id`
 
@@ -762,10 +796,205 @@ curl -X DELETE localhost:3000/adc/secciones/4 -H "Authorization: Bearer eyJ..."
 | --- | --- |
 | la sección no existe o es de otro negocio | `404`: `No existe la sección 4` |
 | **tiene productos** | `409`: `La sección "paneles solares" tiene 3 productos: móvelos a otra sección antes de borrarla` |
+| **tiene subcategorías** | `409`: `La sección "electrodomesticos" tiene 2 subcategorías: bórralas o muévelas antes de borrarla` |
 | es la sección `dulces` (reservada) | `400`: `La sección "dulces" es la de reserva: no se puede borrar` |
 | sin token / rol equivocado | `401` / `403` |
 
-No se borra nada con productos dentro, ni se los manda a escondidas: `producto.seccion_id` es una clave foránea sin `ON DELETE`, así que la base lo rechazaría igual, y mandarlos a `dulces` los escondería de la tienda. Primero se reubican (`PATCH` con `seccion_id`) y después se borra la sección.
+No se borra nada con productos dentro, ni se los manda a escondidas: `producto.seccion_id` es una clave foránea sin `ON DELETE`, así que la base lo rechazaría igual, y mandarlos a `dulces` los escondería de la tienda. Primero se reubican (`PATCH` con `seccion_id`) y después se borra la sección. Lo mismo con las subcategorías: se borran o se mueven a principal (`PATCH` con `padre_id: null`) antes de borrar la categoría.
+
+---
+
+### 21. Instalaciones de ADC y combos de Delys
+
+Las dos «opciones extra» de las páginas (punto 3 de todo.md). No viven en el catálogo compartido: cada una tiene su propia tabla y **no se parecen entre sí** (una lleva una lista de textos, la otra una lista de dulces con cantidad). La lectura es pública; la gestión exige el rol del negocio (o `admin`).
+
+- `adc_instalaciones`: los servicios que ofrece ADC (paneles solares, Ecoflow, baterías…).
+- `delys_combos` + `delys_combo_dulces`: las ofertas de Delys. Los dulces de cada combo se guardan **por nombre**, no por clave foránea al catálogo: el combo puede llevar dulces que ya existen **o** unos escritos a mano en el panel que no se dan de alta.
+
+Las dos comparten el mismo `ImagenService` que usan dulces y productos, con su propia carpeta en Storage (`instalaciones` y `combos`). En ambas, la lista se devuelve **lo último primero** (`creado_en` descendente).
+
+#### 21.1. `GET /adc/instalaciones`
+
+Pública (exenta del límite de peticiones). Devuelve los servicios con su descripción:
+
+```bash
+curl localhost:3000/adc/instalaciones
+# -> { "instalaciones": [ { "id": 1, "nombre_servicio": "Paneles solares", "precio": 18500,
+#                           "moneda": "CUP", "imagen_url": null,
+#                           "descripcion": ["Instalación desde temprano", "Con garantía"] } ] }
+```
+
+`descripcion` es un `text[]`: cada renglón es un punto que la web pinta como viñeta. Un alta sin descripción la deja como lista vacía (`[]`).
+
+#### 21.2. `POST|PATCH|DELETE /adc/instalaciones[/:id]`
+
+Gestión desde el panel, con token `adc` o `admin`. El alta:
+
+```bash
+curl -X POST localhost:3000/adc/instalaciones -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"nombre_servicio":"Paneles solares","precio":18500,"moneda":"CUP","descripcion":["Instalación desde temprano"]}'
+# -> { "mensaje": "Instalación creada", "instalacion": { "id": 1, ... } }
+```
+
+`PATCH` manda solo lo que cambia (todo opcional) y responde `{ "mensaje": "Instalación actualizada", "instalacion": { ... } }`; `DELETE` responde `{ "mensaje": "Instalación eliminada" }`.
+
+| Situación | Respuesta |
+| --- | --- |
+| `nombre_servicio` vacío o de más de 120 letras | `400` |
+| `precio` negativo, no numérico o con más de dos decimales | `400` |
+| `moneda` de más de 8 letras | `400`; si va vacía o no se manda, se asume `CUP` (siempre en mayúsculas) |
+| cada línea de `descripcion` de más de 300 letras | `400`; las líneas vacías se descartan al guardar |
+| `id` inexistente | `404`: `No existe la instalación 1` |
+| sin token / rol equivocado | `401` / `403` |
+
+#### 21.3. `POST|DELETE /adc/instalaciones/:id/imagen`
+
+Multipart con el campo **`imagen`**, igual que las fotos del catálogo. La respuesta trae la instalación actualizada y la cuota:
+
+```bash
+curl -X POST localhost:3000/adc/instalaciones/1/imagen -H "Authorization: Bearer eyJ..." -F imagen=@panel.png
+# -> { "mensaje": "Imagen subida correctamente", "instalacion": { "id": 1, "imagen_url": "https://...", ... }, "cuota": { ... } }
+```
+
+Subir una nueva reemplaza la anterior (y devuelve sus bytes a la cuota); `DELETE` responde `{ "mensaje": "Imagen eliminada", "instalacion": { ..., "imagen_url": null }, "cuota": { ... } }` y no toca el resto de la instalación.
+
+#### 21.4. `GET /delys/combos`
+
+Pública (exenta del límite de peticiones). Devuelve los combos con sus dulces, en el orden en que se dieron de alta dentro del combo:
+
+```bash
+curl localhost:3000/delys/combos
+# -> { "combos": [ { "id": 1, "nombre_combo": "Combo familiar", "precio": 2500, "moneda": "CUP",
+#                    "imagen_url": null,
+#                    "dulces": [ { "nombre_dulce": "Charolas surtida", "cantidad": 2 },
+#                                { "nombre_dulce": "Dulce secreto", "cantidad": 1 } ] } ] }
+```
+
+#### 21.5. `POST|PATCH|DELETE /delys/combos[/:id]`
+
+Gestión desde el panel, con token `delys` o `admin`. El alta:
+
+```bash
+curl -X POST localhost:3000/delys/combos -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"nombre_combo":"Combo familiar","precio":2500,"moneda":"CUP","dulces":[{"nombre_dulce":"Charolas surtida","cantidad":2}]}'
+# -> { "mensaje": "Combo creado", "combo": { "id": 1, ... } }
+```
+
+`PATCH` manda solo lo que cambia y responde `{ "mensaje": "Combo actualizado", "combo": { ... } }`; `DELETE` responde `{ "mensaje": "Combo eliminado" }`.
+
+| Situación | Respuesta |
+| --- | --- |
+| `nombre_combo` vacío o de más de 120 letras | `400` |
+| `precio` negativo, no numérico o con más de dos decimales | `400` |
+| `moneda` de más de 8 letras | `400`; si va vacía o no se manda, se asume `CUP` |
+| un `nombre_dulce` vacío o de más de 120 letras | `400` |
+| `cantidad` que no sea entero o menor que 1 | `400` |
+| `dulces` que no sea una lista | `400`; sin el campo, el combo se crea sin dulces |
+| `id` inexistente | `404`: `No existe el combo 1` |
+| sin token / rol equivocado | `401` / `403` |
+
+**Importante:** si un `PATCH` trae `dulces`, **reemplaza la lista entera** (borra los viejos y mete los nuevos); no los mezcla. Es lo que hace el panel y lo más simple de razonar.
+
+#### 21.6. `POST|DELETE /delys/combos/:id/imagen`
+
+Igual que las instalaciones, con la carpeta `combos` y la clave **`combo`** en la respuesta:
+
+```bash
+curl -X POST localhost:3000/delys/combos/1/imagen -H "Authorization: Bearer eyJ..." -F imagen=@combo.png
+# -> { "mensaje": "Imagen subida correctamente", "combo": { "id": 1, "imagen_url": "https://...", ... }, "cuota": { ... } }
+```
+
+El borrado responde `{ "mensaje": "Imagen eliminada", "combo": { ..., "imagen_url": null }, "cuota": { ... } }`. Al borrar un combo, sus renglones de `delys_combo_dulces` se van en cascada con él.
+
+---
+
+### 22. Modelos de una publicación
+
+Una publicación del catálogo («nevera inverter») puede venderse en varias **variantes** —los «240 L / 340 L / 420 L» de toda la vida—, cada una con su precio, su foto y su ficha técnica. Es **solo de ADC**: Delys no la usa y no tiene estas rutas.
+
+Viven en su propia tabla, `producto_modelo`, enlazada a `producto` con `ON DELETE CASCADE`: **borrando la publicación se borran sus modelos**. Dos reglas de la tabla mandan:
+
+- `UNIQUE(producto_id, nombre)`: el mismo nombre puede repetirse en publicaciones distintas, nunca dentro de la misma.
+- `atributos` es un `jsonb` de pares `etiqueta: valor`. **`jsonb` no conserva el orden de escritura** (los reordena al guardarlos), así que quien necesite un orden en la web lo fija él, no la base.
+
+La lectura es pública (la vitrina la pinta); la gestión exige rol `adc` o `admin`, como el catálogo. **El negocio se resuelve por el padre**: un `producto_id` o un id de modelo que sea de Delys responde `404`, no `403`, para que la vitrina no delate qué publicaciones hay en el otro negocio.
+
+#### 22.1. `modelos` dentro de `GET /adc/productos`
+
+La lista del catálogo mete los modelos de cada producto en la misma respuesta, con **una sola consulta extra** para todo el catálogo:
+
+```bash
+curl localhost:3000/adc/productos
+# -> { "productos": [ { "id": 5, "nombre": "Nevera No Frost 250 L", "precio": 320, "moneda": "USD",
+#                       "seccion": "neveras", "seccion_id": 8,
+#                       "modelos": [ { "id": 16, "producto_id": 5, "nombre": "240 L inverter",
+#                                      "precio": 320, "moneda": "USD", "imagen_url": null,
+#                                      "atributos": { "Peso": "38 kg", "Ruido": "41 dB" } } ] } ],
+#      "secciones": [ ... ] }
+```
+
+`[]` cuando la publicación se vende sin modelos: la web y el panel no tienen que distinguir entre «sin modelos» y «no los pedí». Las rutas de gestión responden el modelo con la **misma forma** (`imagen_bytes`, `creado_en` y la relación `producto` se quedan fuera).
+
+#### 22.2. `GET /adc/productos/:id/modelos`
+
+Pública y exenta del límite de peticiones, para quien solo quiera los modelos de una publicación (en el orden de su `id`):
+
+```bash
+curl localhost:3000/adc/productos/5/modelos
+# -> { "modelos": [ { "id": 16, ... }, { "id": 17, ... } ] }
+```
+
+#### 22.3. `POST /adc/productos/:id/modelos`
+
+Alta desde el panel. La publicación va **en la URL**: el cuerpo no acepta `id` ni `producto_id` (el `ValidationPipe` los rechaza), para que nadie pueda colgar un modelo de una publicación a otra.
+
+```bash
+curl -X POST localhost:3000/adc/productos/5/modelos -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"240 L inverter","precio":320,"moneda":"USD","atributos":{"Peso":"38 kg","Ruido":"41 dB"}}'
+# -> { "mensaje": "Modelo creado", "modelo": { "id": 16, "producto_id": 5, ... } }
+```
+
+| Situación | Respuesta |
+| --- | --- |
+| `nombre` vacío o de más de 120 letras | `400` |
+| `precio` negativo, no numérico o con más de dos decimales | `400` |
+| `moneda` de más de 8 letras | `400`; vacía o ausente deja `CUP` (siempre en mayúsculas) |
+| `atributos` que no sea un objeto de texto | `400`: `Las características tienen que ser un objeto de "nombre": "valor"` |
+| una característica sin nombre, o sin valor | `400`; los pares totalmente vacíos se descartan sin quejarse |
+| nombre de característica de más de 40 letras, o valor de más de 120 | `400` |
+| más de 12 características | `400`: `Un modelo no puede tener más de 12 características` |
+| `id` de publicación inexistente o de **otro negocio** | `404`: `No existe el producto 5` |
+| nombre repetido en la misma publicación | `409`: `Este producto ya tiene un modelo llamado "240 L inverter"` |
+| sin token / rol equivocado | `401` / `403` |
+
+#### 22.4. `PATCH|DELETE /adc/modelos/:id`
+
+Edición y borrado por el id del **modelo** (no de la publicación):
+
+```bash
+curl -X PATCH localhost:3000/adc/modelos/16 -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" -d '{"precio":340,"atributos":{"Peso":"40 kg"}}'
+# -> { "mensaje": "Modelo actualizado", "modelo": { "id": 16, "precio": 340, ... } }
+
+curl -X DELETE localhost:3000/adc/modelos/16 -H "Authorization: Bearer eyJ..."
+# -> { "mensaje": "Modelo eliminado" }
+```
+
+Todos los campos son opcionales, pero uno tiene que venir: un `PATCH` vacío es `400` (`No mandaste ningún campo que cambiar`), igual que en el resto del catálogo. **`atributos` se reemplaza entero**, no se fusiona: para cambiar un par se manda la ficha completa. Un `id` de otro negocio responde `404`: `No existe el modelo 16`. Renombrar a un nombre ya usado por otro modelo de la misma publicación es `409`.
+
+#### 22.5. `POST|DELETE /adc/modelos/:id/imagen`
+
+Multipart con el campo **`imagen`**, la misma cuota y el mismo bucket que el catálogo; solo cambia la carpeta, que es `modelos/`:
+
+```bash
+curl -X POST localhost:3000/adc/modelos/16/imagen -H "Authorization: Bearer eyJ..." -F imagen=@nevera.png
+# -> { "mensaje": "Imagen subida correctamente", "modelo": { "id": 16, "imagen_url": "https://...", ... }, "cuota": { ... } }
+```
+
+Subir otra reemplaza la anterior (y devuelve sus bytes a la cuota); `DELETE` responde `{ "mensaje": "Imagen eliminada", "modelo": { ..., "imagen_url": null }, "cuota": { ... } }`. Sin archivo en el `POST` es `400`: `Falta el archivo. Envíalo como multipart/form-data en el campo "imagen"`. Los mismos topes de tipo y tamaño que las fotos del catálogo (API.md, sección 15).
 
 ---
 

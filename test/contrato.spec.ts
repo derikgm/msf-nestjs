@@ -30,6 +30,8 @@ import { JwtAuthGuard } from '../src/auth/auth.guard.js';
 import { RolesGuard } from '../src/auth/roles.guard.js';
 import { CatalogoService } from '../src/common/services/catalogo.service.js';
 import { DulceImagenService } from '../src/common/services/dulce-imagen.service.js';
+import { InstalacionesService } from '../src/common/services/instalaciones.service.js';
+import { ModelosService } from '../src/common/services/modelos.service.js';
 import { HttpErrorFilter } from '../src/common/filters/http-error.filter.js';
 
 const SECRETO_PRUEBA = 'clave-de-prueba-de-los-tests';
@@ -61,8 +63,21 @@ const catalogoServiceMock = {
     ],
   })),
   listarSecciones: vi.fn(async () => ({
-    secciones: [{ id: 4, nombre: 'electronico' }],
+    secciones: [
+      { id: 4, nombre: 'electrodomesticos', padre_id: null },
+      { id: 8, nombre: 'neveras', padre_id: 4 },
+    ],
   })),
+  crearSeccion: vi.fn(async (nombre: string, padreId?: number | null) => ({
+    mensaje: 'Sección creada correctamente',
+    seccion: { id: 9, nombre, padre_id: padreId ?? null },
+  })),
+  actualizarSeccion: vi.fn(
+    async (id: number, cambios: { nombre?: string; padre_id?: number | null }) => ({
+      mensaje: 'Sección actualizada correctamente',
+      seccion: { id, nombre: cambios.nombre ?? 'neveras', padre_id: cambios.padre_id ?? null },
+    }),
+  ),
 };
 
 // La subida real va a Supabase Storage; aquí el servicio devuelve el contrato
@@ -85,6 +100,61 @@ const imagenServiceMock = {
       bytes_usados: 1024,
       limite_bytes: 20971520,
       bytes_disponibles: 20970496,
+    },
+  })),
+};
+
+// Punto 3 de todo.md: el controlador de ADC ahora inyecta también el servicio
+// de instalaciones. Se mockea igual que los demás para no tocar la base.
+const instalacionesServiceMock = {
+  listar: vi.fn(async () => [
+    {
+      id: 3,
+      nombre_servicio: 'Paneles solares',
+      precio: 45000,
+      moneda: 'CUP',
+      imagen_url: null,
+      descripcion: ['Diseño', 'Montaje'],
+    },
+  ]),
+};
+
+// Modelos de una publicación (240 L / 340 L / 420 L). El servicio devuelve la
+// entidad completa —con `imagen_bytes`, `creado_en` y la relación `producto`— y
+// el controlador tiene que recortarla: aquí se prueba eso, no la base de datos.
+const modeloDeMuestra = {
+  id: 21,
+  producto_id: 7,
+  nombre: '240 L inverter',
+  precio: 320,
+  moneda: 'USD',
+  imagen_url: null,
+  imagen_bytes: 5120,
+  atributos: { Peso: '38 kg', Capacidad: '240 L' },
+  creado_en: new Date('2026-11-01T10:00:00Z'),
+  producto: { id: 7, negocio: 'adc' },
+};
+
+const modelosServiceMock = {
+  porPublicaciones: vi.fn(async (ids: number[]) =>
+    new Map(ids.map((id) => [id, [{ ...modeloDeMuestra, producto_id: id }]])),
+  ),
+  porPublicacion: vi.fn(async () => [modeloDeMuestra]),
+  crear: vi.fn(async (productoId: number, dto: { nombre: string; precio: number }) => ({
+    mensaje: 'Modelo creado',
+    modelo: { ...modeloDeMuestra, producto_id: productoId, nombre: dto.nombre, precio: dto.precio },
+  })),
+  subirImagen: vi.fn(async () => ({
+    mensaje: 'Imagen subida correctamente',
+    modelo: {
+      ...modeloDeMuestra,
+      imagen_url: 'https://proyecto.supabase.co/storage/v1/object/public/adc/modelos/nevera.png',
+    },
+    cuota: {
+      rol: 'adc',
+      bytes_usados: 2048,
+      limite_bytes: 20971520,
+      bytes_disponibles: 20969472,
     },
   })),
 };
@@ -116,6 +186,8 @@ describe('Contratos de la API (X-5, sin base de datos viva)', () => {
         { provide: AuthService, useValue: authServiceMock },
         { provide: CatalogoService, useValue: catalogoServiceMock },
         { provide: DulceImagenService, useValue: imagenServiceMock },
+        { provide: InstalacionesService, useValue: instalacionesServiceMock },
+        { provide: ModelosService, useValue: modelosServiceMock },
       ],
     }).compile();
 
@@ -184,6 +256,83 @@ describe('Contratos de la API (X-5, sin base de datos viva)', () => {
     // Proyección N-15: los campos internos no viajan en la API pública.
     expect(producto.imagen_bytes).toBeUndefined();
     expect(producto.negocio).toBeUndefined();
+
+    // Subcategorías: cada sección dice de cuál cuelga (`null` = principal).
+    expect(res.body.secciones).toEqual([
+      { id: 4, nombre: 'electrodomesticos', padre_id: null },
+      { id: 8, nombre: 'neveras', padre_id: 4 },
+    ]);
+
+    // Modelos: cada producto trae los suyos en la misma llamada, recortados.
+    // `toEqual` es estricto, así que esto falla también si se cuela
+    // `imagen_bytes`, `creado_en` o la relación `producto` (N-15).
+    expect(producto.modelos).toEqual([
+      {
+        id: 21,
+        producto_id: 7,
+        nombre: '240 L inverter',
+        precio: 320,
+        moneda: 'USD',
+        imagen_url: null,
+        atributos: { Peso: '38 kg', Capacidad: '240 L' },
+      },
+    ]);
+  });
+
+  it('POST /adc/secciones crea una subcategoría cuando llega padre_id', async () => {
+    const token = await jwtService.signAsync({
+      sub: '11111111-1111-4111-8111-111111111111',
+      usuario: 'jefa',
+      rol: 'adc',
+    });
+
+    const res = await request(app.getHttpServer())
+      .post('/adc/secciones')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'neveras', padre_id: 4 });
+
+    expect(res.status).toBe(201);
+    expect(catalogoServiceMock.crearSeccion).toHaveBeenCalledWith('neveras', 4);
+    expect(res.body.seccion.padre_id).toBe(4);
+  });
+
+  it('PATCH /adc/secciones/:id puede mover la sección a principal con padre_id null', async () => {
+    const token = await jwtService.signAsync({
+      sub: '11111111-1111-4111-8111-111111111111',
+      usuario: 'jefa',
+      rol: 'adc',
+    });
+
+    const res = await request(app.getHttpServer())
+      .patch('/adc/secciones/8')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ padre_id: null });
+
+    expect(res.status).toBe(200);
+    expect(catalogoServiceMock.actualizarSeccion).toHaveBeenCalledWith(8, {
+      nombre: undefined,
+      padre_id: null,
+    });
+    expect(res.body.seccion.padre_id).toBeNull();
+  });
+
+  it('GET /adc/instalaciones devuelve las instalaciones, sin imagen_bytes ni creado_en', async () => {
+    const res = await request(app.getHttpServer()).get('/adc/instalaciones');
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.instalaciones)).toBe(true);
+
+    const instalacion = res.body.instalaciones[0];
+    expect(instalacion).toMatchObject({
+      id: 3,
+      nombre_servicio: 'Paneles solares',
+      precio: 45000,
+      moneda: 'CUP',
+      imagen_url: null,
+      descripcion: ['Diseño', 'Montaje'],
+    });
+    expect(instalacion.imagen_bytes).toBeUndefined();
+    expect(instalacion.creado_en).toBeUndefined();
   });
 
   it('POST /adc/productos/:id/imagen parsea el multipart (multer 2) y responde con la clave producto', async () => {
@@ -233,5 +382,96 @@ describe('Contratos de la API (X-5, sin base de datos viva)', () => {
     expect(res.status).toBe(401);
     expect(res.body.statusCode).toBe(401);
     expect(imagenServiceMock.subir).not.toHaveBeenCalled();
+  });
+
+  // --- Modelos de una publicación ----------------------------------------------
+
+  it('GET /adc/productos/:id/modelos es público y responde { modelos }', async () => {
+    const res = await request(app.getHttpServer()).get('/adc/productos/7/modelos');
+
+    expect(res.status).toBe(200);
+    expect(modelosServiceMock.porPublicacion).toHaveBeenCalledWith(7);
+    expect(res.body.modelos).toHaveLength(1);
+    expect(res.body.modelos[0].atributos).toEqual({ Peso: '38 kg', Capacidad: '240 L' });
+    expect(res.body.modelos[0].imagen_bytes).toBeUndefined();
+    expect(res.body.modelos[0].producto).toBeUndefined();
+  });
+
+  it('POST /adc/productos/:id/modelos pide token y pasa el cuerpo validado al servicio', async () => {
+    const sinToken = await request(app.getHttpServer())
+      .post('/adc/productos/7/modelos')
+      .send({ nombre: '340 L', precio: 45000 });
+    expect(sinToken.status).toBe(401);
+
+    const token = await jwtService.signAsync({
+      sub: '11111111-1111-4111-8111-111111111111',
+      usuario: 'jefa',
+      rol: 'adc',
+    });
+
+    const res = await request(app.getHttpServer())
+      .post('/adc/productos/7/modelos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: '340 L', precio: 45000, moneda: 'usd', atributos: { Peso: '39 kg' } });
+
+    expect(res.status).toBe(201);
+    // La publicación va en la URL, no en el cuerpo: el servicio recibe (7, dto).
+    expect(modelosServiceMock.crear).toHaveBeenCalledWith(7, {
+      nombre: '340 L',
+      precio: 45000,
+      moneda: 'usd',
+      atributos: { Peso: '39 kg' },
+    });
+    expect(res.body.mensaje).toBe('Modelo creado');
+    expect(res.body.modelo.nombre).toBe('340 L');
+  });
+
+  it('el alta de modelos rechaza una ficha que no es objeto y el producto_id suelto', async () => {
+    const token = await jwtService.signAsync({
+      sub: '11111111-1111-4111-8111-111111111111',
+      usuario: 'jefa',
+      rol: 'adc',
+    });
+
+    const fichaRota = await request(app.getHttpServer())
+      .post('/adc/productos/7/modelos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: '240 L', precio: 1, atributos: 'Peso: 38 kg' });
+
+    expect(fichaRota.status).toBe(400);
+    expect(JSON.stringify(fichaRota.body.mensaje)).toContain('características');
+
+    // `producto_id` no es del cliente: si lo admitiera, un modelo podría
+    // colgarse de la publicación de otro (o de otro negocio).
+    const cuerpoDeMas = await request(app.getHttpServer())
+      .post('/adc/productos/7/modelos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: '240 L', precio: 1, producto_id: 99 });
+
+    expect(cuerpoDeMas.status).toBe(400);
+    expect(JSON.stringify(cuerpoDeMas.body.mensaje)).toContain('producto_id');
+    expect(modelosServiceMock.crear).not.toHaveBeenCalled();
+  });
+
+  it('POST /adc/modelos/:id/imagen parsea el multipart y responde con la clave modelo', async () => {
+    const token = await jwtService.signAsync({
+      sub: '11111111-1111-4111-8111-111111111111',
+      usuario: 'jefa',
+      rol: 'adc',
+    });
+
+    const res = await request(app.getHttpServer())
+      .post('/adc/modelos/21/imagen')
+      .set('Authorization', `Bearer ${token}`)
+      .attach('imagen', PNG_1X1, { filename: 'nevera.png', contentType: 'image/png' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.modelo.imagen_url).toContain('/adc/modelos/nevera.png');
+    expect(res.body.modelo.imagen_bytes).toBeUndefined();
+    expect(res.body.cuota.rol).toBe('adc');
+
+    const [id, file] = modelosServiceMock.subirImagen.mock.calls[0];
+    expect(id).toBe(21);
+    expect(file.mimetype).toBe('image/png');
   });
 });

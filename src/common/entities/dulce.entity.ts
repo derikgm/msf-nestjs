@@ -37,6 +37,13 @@ export class Dulce implements DulceShape {
   imagen_bytes: number | null;
 
   /**
+   * Descripción larga del producto (opcional). Null cuando el dueño todavía no
+   * la ha escrito: la vitrina enseña solo nombre, precio y moneda.
+   */
+  @Column({ type: 'text', nullable: true })
+  descripcion: string | null;
+
+  /**
    * Moneda en la que se entiende `precio`. **Texto (máx. 8), no booleano ni
    * enum**: así en el futuro caben más monedas sin tocar ni la base ni el
    * servidor (punto 5 de msf-app/todo.md).
